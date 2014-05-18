@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Project Version="1.0">
+  <Title>HTTP Manager</Title>
+  <Summary>Managed COM compatible HTTP access.</Summary>
+  <Author>Sebastian Klatte</Author>
+  <Email/>
+  <Copyright>2014</Copyright>
+  <Comment/>
+  <Language>2057</Language>
+  <Charset>255</Charset>
+  <HeaderHtml>&lt;%TopicTitle%&gt;</HeaderHtml>
+  <FooterHtml>(c) 2014 Sebastian Klatte
+Powered by &lt;a href="http://www.devjetsoftware.com" target="_blank"&gt;Documentation Insight&lt;/a&gt;</FooterHtml>
+  <CustomDefines/>
+  <ShowImplementationSection>true</ShowImplementationSection>
+  <ShowPrivateMembers>false</ShowPrivateMembers>
+  <ShowInheritedMembers>true</ShowInheritedMembers>
+  <ShowPropertyAccessors>true</ShowPropertyAccessors>
+  <FileNamePolicy>0</FileNamePolicy>
+  <CompilerVersion>12</CompilerVersion>
+  <TargetPlatform>0</TargetPlatform>
+  <Sources>
+    <Source>.\HTTPManager.dpk</Source>
+  </Sources>
+  <Outputs>
+    <Output Type="HTML">
+      <Active>true</Active>
+      <OutputDirectory>Doc\Html</OutputDirectory>
+    </Output>
+    <Output Type="CHM">
+      <Active>true</Active>
+      <OutputFileName>Doc\CHM\HTTPManager.chm</OutputFileName>
+    </Output>
+    <Output Type="MSHELP2">
+      <Active>true</Active>
+      <OutputFileName>Doc\MSHelp2\HTTPManager.HxS</OutputFileName>
+      <Namespace>HTTPManager</Namespace>
+      <TitleID>library</TitleID>
+    </Output>
+    <Output Type="HelpAndManual">
+      <Active>false</Active>
+      <OutputFileName>Doc\Help&amp;Manual\HTTPManager.hmxp</OutputFileName>
+    </Output>
+  </Outputs>
+</Project>

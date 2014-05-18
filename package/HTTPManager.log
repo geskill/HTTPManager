@@ -1,0 +1,32 @@
+Validating...
+Compiling projects...
+Compiling documentation...
+C:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\src\implementors\ms-help://embarcadero.rs2010/Indy/TIdResponseHeaderInfo_Location.html
+C:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\src\implementors\ms-help://embarcadero.rs2010/Indy/TIdHTTP.html
+C:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\src\implementors\ms-help://embarcadero.rs2010/Indy/TIdHTTPResponse_ResponseCode.html
+C:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\src\implementors\ms-help://embarcadero.rs2010/Indy/TIdResponseHeaderInfo_Location.html
+Unresolved cref attribute "uHTTPInterface.IHTTPManager" in uHTTPManager.
+Unresolved cref attribute "uHTTPInterface.IHTTPHeader.Cookies" in uHTTPManager.THTTPManager.Get(WideString,Double,IHTTPOptions).
+Unresolved cref attribute "uHTTPInterface.IHTTPHeader.CharSet" in uHTTPManager.THTTPManager.Get(WideString,Double,IHTTPOptions).
+Unresolved cref attribute "uHTTPInterface.IHTTPHeader.CustomHeaders" in uHTTPManager.THTTPManager.Get(WideString,Double,IHTTPOptions).
+Unresolved cref attribute "uHTTPInterface.IHTTPHeader.Cookies" in uHTTPManager.THTTPManager.Post(WideString,Double,IHTTPParams,IHTTPOptions).
+Unresolved cref attribute "uHTTPInterface.IHTTPHeader.CharSet" in uHTTPManager.THTTPManager.Post(WideString,Double,IHTTPParams,IHTTPOptions).
+Unresolved cref attribute "uHTTPInterface.IHTTPHeader.CustomHeaders" in uHTTPManager.THTTPManager.Post(WideString,Double,IHTTPParams,IHTTPOptions).
+Building TableOfContents Tree...
+Building Index Tree...
+Creating Urls...
+DefaultTopic: HTTPManager.htm
+DefaultTopicID: HTTPManager
+Generating Web pages...
+Generating ToC page: "C:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\package\Doc\Html\toc.htm"
+Generating toc.js: "C:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\package\Doc\Html\toc.js"
+Generating Keywords.js: "C:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\package\Doc\Html\keywords.js"
+Generating index page: "C:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\package\Doc\Html\index.htm"
+Generating CHM file...
+HHC5010: Error: Cannot open "c:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\package\Doc\CHM\HTTPManager.chm". Compilation stopped.
+
+Generating MSHelp V2.x file...
+HXC4001: File file:///C:/Users/geskill/Documents/RAD%20Studio/Projekte/IntelligeN%202009%20Tests/HTTPManager/package/Doc/Html/HTTPManager.HxC, Line 2, Char 77: XML syntax error: Von der angegebenen Ressource sind keine Daten verfügbar.
+Fehler beim Bearbeiten der Ressource 'ms-help://Hx/Resources/HelpCollection.DTD'.
+
+HXC2056: Failed to parse the XML file: C:\Users\geskill\Documents\RAD Studio\Projekte\IntelligeN 2009 Tests\HTTPManager\package\Doc\Html\HTTPManager.HxC

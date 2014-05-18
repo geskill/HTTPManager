@@ -1,0 +1,8 @@
+Der HTTPManager ist eine Klasse, die GET/POST Requests annimmt und diese im Hintergrund (einzeln) hintereinander bearbeitet. (Für Dateidownloads ist diese Klasse eher weniger gedacht!)
+
+Das besondere am HTTPManager ist, dass es komplett auf Interfaces gestützt ist, die nur COM Datentypen verwenden und so ideal in einem Pluginsystem eingebunden werden kann. So wird z.B. die HTTPManager Klasse in dem Hauptprogramm erstellt und das Interface an die Plugins weitergegeben. Als Ausgangsbasis dient die HTTP Komponente von Indy, die Hintergrundarbeit wird mit der OmniThreadLibrary erledigt.
+Es war mir außerdem wichtig, dass der Benutzer sich so wenig wie nötig mit Cookies, Parameterkodierungen oder z.B. Socks Konfigurationen beschäftigen muss. Es wurden diverse wichtige Konfigurationen direkt integriert, sinnvolle Standardwerte gesetzt und z.B. bei den POST-Parametern ein automatische abstrakte Parameterklasse integriert (wählt selbstständig ContentType).
+
+Da die Kommunikation mit dem Internet aus Anwendungen heraus immer wichtiger wird und dies besonders bei Delphi Einsteigern gerne probiert wird, bietet diese Komponente das Ideale Handwerkszeug zur Realisierung. Natürlich gibt es in Delphi auch fertige Klassen um damit beispielsweise XML Requests zu basteln; aber diese beschränken sich dann halt immer auch bestimmte Voraussetzungen.
+
+Ein kleiner Bonus: der HTTPManager speichert alle Aktivitäten über den Programmverlauf, sodass man auch zu späteren Zeitpunkten an gezielte Requests kommt oder dem Nutzer z.B. über eine visuelle Oberfläche eine Art HTTP Logger bietet.

@@ -1,0 +1,21 @@
+﻿<?xml version="1.0"?>
+<!DOCTYPE HelpCollection>
+<HelpCollection
+  DTDVersion="1.0"
+  FileVersion="1.0"
+  Title="HTTP Manager">
+
+  <TOCDef File="Master.HxT"/>
+
+  <KeywordIndexDef File="Master.HxK"/>
+  <KeywordIndexDef File="Master_A.HxK"/>
+  <KeywordIndexDef File="Master_F.HxK"/>
+  <KeywordIndexDef File="Master_NamedURL.HxK"/>
+
+  <ItemMoniker Name="!DefaultFullTextSearch" ProgId="HxDs.HxFullTextSearch" InitData=""/>
+  <ItemMoniker Name="!DefaultTOC" ProgId="HxDs.HxHierarchy" InitData=""/>
+  <ItemMoniker Name="!DefaultKeywordIndex" ProgId="HxDs.HxIndex" InitData="K"/>
+  <ItemMoniker Name="!DefaultAssociativeIndex" ProgId="HxDs.HxIndex" InitData="A"/>
+  <ItemMoniker Name="!DefaultContextWindowIndex" ProgId="HxDs.HxIndex" InitData="F"/>
+  <ItemMoniker Name="!DefaultNamedUrlIndex" ProgId="HxDs.HxIndex" InitData="NamedUrlIndex"/>
+</HelpCollection>
