@@ -21,6 +21,7 @@ type
     eGETRequest: TEdit;
     bDownload: TButton;
     Image: TImage;
+    procedure FormCreate(Sender: TObject);
     procedure bCloseClick(Sender: TObject);
     procedure bDownloadClick(Sender: TObject);
   private
@@ -36,6 +37,11 @@ var
 implementation
 
 {$R *.dfm}
+
+procedure TMain.FormCreate(Sender: TObject);
+begin
+  Caption := Caption + ' - ' + THTTPManager.Instance().Implementor.Name;
+end;
 
 procedure TMain.bDownloadClick(Sender: TObject);
 var

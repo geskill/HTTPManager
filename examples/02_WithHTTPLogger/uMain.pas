@@ -11,7 +11,7 @@ uses
   // OmniThreadLibrary
   OtlParallel, OtlTaskControl,
   // IdHTTPManager
-  uHTTPInterface, uHTTPManager, uHTTPClasses;
+  uHTTPInterface, uHTTPManager, uHTTPClasses, dxBarBuiltInMenu;
 
 type
   TMain = class(TForm)
@@ -28,6 +28,7 @@ type
     mPOSTParams: TMemo;
     lPOSTParams: TLabel;
     mPOSTResult: TMemo;
+    procedure FormCreate(Sender: TObject);
     procedure bGETClick(Sender: TObject);
     procedure bPOSTClick(Sender: TObject);
     procedure bHTTPLoggerClick(Sender: TObject);
@@ -47,6 +48,11 @@ uses
   uHTTPLogger;
 
 {$R *.dfm}
+
+procedure TMain.FormCreate(Sender: TObject);
+begin
+  Caption := Caption + ' - ' + THTTPManager.Instance().Implementor.Name;
+end;
 
 procedure TMain.bGETClick(Sender: TObject);
 var

@@ -11,6 +11,7 @@ object Main: TMain
   Font.Name = 'Tahoma'
   Font.Style = []
   OldCreateOrder = False
+  OnCreate = FormCreate
   DesignSize = (
     635
     300)
@@ -33,6 +34,10 @@ object Main: TMain
     object cxTSGetRequest: TcxTabSheet
       Caption = 'GET-Request'
       ImageIndex = 0
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       DesignSize = (
         611
         225)

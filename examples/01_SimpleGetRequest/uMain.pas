@@ -17,6 +17,7 @@ type
     eGETRequest: TEdit;
     bGET: TButton;
     mGETResult: TMemo;
+    procedure FormCreate(Sender: TObject);
     procedure bCloseClick(Sender: TObject);
     procedure bGETClick(Sender: TObject);
   private
@@ -31,6 +32,11 @@ var
 implementation
 
 {$R *.dfm}
+
+procedure TMain.FormCreate(Sender: TObject);
+begin
+  Caption := Caption + ' - ' + THTTPManager.Instance().Implementor.Name;
+end;
 
 procedure TMain.bGETClick(Sender: TObject);
 var
