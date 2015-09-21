@@ -37,10 +37,16 @@
 ///   Contributors      : GJ, Lee_Nover 
 /// 
 ///   Creation date     : 2008-06-12
-///   Last modification : 2012-01-31
-///   Version           : 2.09a
+///   Last modification : 2015-09-07
+///   Version           : 2.11
 /// </para><para>
 ///   History:
+///     2.11: 2015-09-07
+///       - Setting MinWorkers property will start up idle worker threads if total number
+///         of threads managed by the thread pool is lower than the new value.
+///     2.10: 2015-09-03
+///       - Removed limitation on max 60 threads in a pool (faciliated by changes in
+///         OtlTaskControl).
 ///     2.09a: 2012-01-31
 ///       - More accurate CountQueued.
 ///     2.09: 2011-11-08
@@ -116,9 +122,6 @@ uses
 const
   CDefaultIdleWorkerThreadTimeout_sec = 10;
   CDefaultWaitOnTerminate_sec = 30;
-
-  CMaxConcurrentWorkers = 60; // enforced by the TOmniWorker limitations 
-  // this is not configurable - don't increment it and expect the code to magically work! 
 
 type
   IOmniThreadPool = interface;
@@ -331,6 +334,7 @@ type
     owWorkItemQueue    : TObjectList;
   strict protected
     function  ActiveWorkItemDescriptions: string;
+    function  CreateWorker: TOTPWorkerThread;
     procedure ForwardThreadCreated(threadID: DWORD);
     procedure ForwardThreadDestroying(threadID: DWORD;
       threadPoolOperation: TThreadPoolOperation; worker: TOTPWorkerThread = nil);
@@ -514,8 +518,8 @@ end; { TOTPWorkItem.Create }
 
 function TOTPWorkItem.Description: string;
 begin
-  if assigned(task) then
-    Result := Format('%s:%d', [task.Name, UniqueID])
+  if assigned(Task) then
+    Result := Format('%s:%d', [Task.Name, UniqueID])
   else
     Result := Format(':%d', [UniqueID]);
 end; { TOTPWorkItem.Description }
@@ -649,7 +653,7 @@ var
   stopUserTime   : int64;
 {$ENDIF LogThreadPool}
 var
-  task     : IOmniTask;
+  task: IOmniTask;
 begin
   WorkItem_ref := workItem;
   task := WorkItem_ref.task;
@@ -873,7 +877,7 @@ begin
   IdleWorkerThreadTimeout_sec.Value := CDefaultIdleWorkerThreadTimeout_sec;
   WaitOnTerminate_sec.Value := CDefaultWaitOnTerminate_sec;
   MaxExecuting.Value := Length(DSiGetThreadAffinity);
-  task.SetTimer(1, 1000, @TOTPWorker.MaintainanceTimer);
+  Task.SetTimer(1, 1000, @TOTPWorker.MaintainanceTimer);
   Result := true;
 end; { TOTPWorker.Initialize }
 
@@ -1005,10 +1009,14 @@ end; { TOTPWorker.MaintainanceTimer }
 
 procedure TOTPWorker.CheckIdleQueue;
 var
+  worker: TOTPWorkerThread;
   workItem: TOTPWorkItem;
 begin
-  if (not owDestroying) and (owWorkItemQueue.Count > 0) and
-    ((owIdleWorkers.Count > 0) or (owRunningWorkers.Count < MaxExecuting.Value)) then
+  if owDestroying then
+    Exit;
+
+  if (owWorkItemQueue.Count > 0) and
+     ((owIdleWorkers.Count > 0) or (owRunningWorkers.Count < MaxExecuting.Value)) then
   begin
     workItem := TOTPWorkItem(owWorkItemQueue[0]);
     owWorkItemQueue.Delete(0);
@@ -1016,7 +1024,20 @@ begin
     {$IFDEF LogThreadPool}Log('Dequeueing %s ', [workItem.Description]);{$ENDIF LogThreadPool}
     ScheduleNext(workItem);
   end;
+
+  // spin up threads
+  while ((owIdleWorkers.Count + CountRunning.Value) < MinWorkers.Value) do begin
+    worker := CreateWorker;
+    owIdleWorkers.Add(worker);
+  end;
 end; { TOTPWorker.CheckIdleQueue }
+
+function TOTPWorker.CreateWorker: TOTPWorkerThread;
+begin
+  Result := TOTPWorkerThread.Create(owThreadDataFactory);
+  Task.RegisterComm(Result.OwnerCommEndpoint);
+  Result.Start;
+end; { TOTPWorker.CreateWorker }
 
 procedure TOTPWorker.MsgCompleted(var msg: TOmniMessage);
 begin
@@ -1067,10 +1088,6 @@ begin
     owMonitorObserver.Send(COmniPoolMsg, 0, cardinal
       (TOmniThreadPoolMonitorInfo.Create(owUniqueID, workItem.UniqueID)));
   FreeAndNil(workItem);
-  // if (not (owDestroying)) and (owStoppingWorkers.IndexOf(worker) >= 0) then begin 
-  // owStoppingWorkers.Remove(worker); 
-  // owIdleWorkers.Add(worker); 
-  // end; 
   if owRunningWorkers.IndexOf(worker) < 0 then
     worker := nil;
   if assigned(worker) then begin // move it back to the idle queue 
@@ -1184,15 +1201,7 @@ begin
       {$ENDIF LogThreadPool}
     end
     else begin
-      if (owRunningWorkers.Count + owIdleWorkers.Count + owStoppingWorkers.Count)
-         >= CMaxConcurrentWorkers
-      then
-        raise Exception.CreateFmt(
-          'TOTPWorker.ScheduleNext: Cannot start more than %d threads ' +
-            'due to the implementation limitations', [CMaxConcurrentWorkers]);
-      worker := TOTPWorkerThread.Create(owThreadDataFactory);
-      worker.Start;
-      task.RegisterComm(worker.OwnerCommEndpoint);
+      worker := CreateWorker;
       owRunningWorkers.Add(worker);
       CountRunning.Increment;
       {$IFDEF LogThreadPool}Log(
@@ -1298,14 +1307,13 @@ begin
   inherited;
 end; { TOmniThreadPool.Destroy }
 
-/// <returns>True: Normal exit, False: Thread was killed.</returns> 
+/// <returns>True: Normal exit, False: Thread was killed.</returns>
+{$WARN NO_RETVAL OFF}
+// starting with XE, Delphi complains that result is not always assigned
 function TOmniThreadPool.Cancel(taskID: int64): boolean;
 var
   res: TOmniWaitableValue;
 begin
-  {$IF CompilerVersion >= 22} // starting with XE, Delphi complains that result is not always assigned if this line is removed
-  Result := false; // not really used
-  {$IFEND}
   res := TOmniWaitableValue.Create;
   try
     otpWorkerTask.Invoke(@TOTPWorker.Cancel, [taskID, res]);
@@ -1313,6 +1321,7 @@ begin
     Result := res.Value;
   finally FreeAndNil(res); end;
 end; { TOmniThreadPool.Cancel }
+{$WARN NO_RETVAL ON}
 
 procedure TOmniThreadPool.CancelAll;
 var
@@ -1421,10 +1430,6 @@ end; { TOmniThreadPool.SetIdleWorkerThreadTimeout_sec }
 
 procedure TOmniThreadPool.SetMaxExecuting(value: integer);
 begin
-  if value > CMaxConcurrentWorkers then
-    raise Exception.CreateFmt('TOmniThreadPool.SetMaxExecuting: ' +
-        'MaxExecuting cannot be larger than %d due to the implementation limitations',
-      [CMaxConcurrentWorkers]);
   WorkerObj.MaxExecuting.Value := value;
   otpWorkerTask.Invoke(@TOTPWorker.CheckIdleQueue);
 end; { TOmniThreadPool.SetMaxExecuting }
@@ -1444,6 +1449,7 @@ end; { TOmniThreadPool.SetMaxQueuedTime_sec }
 procedure TOmniThreadPool.SetMinWorkers(value: integer);
 begin
   WorkerObj.MinWorkers.Value := value;
+  otpWorkerTask.Invoke(@TOTPWorker.CheckIdleQueue);
 end; { TOmniThreadPool.SetMinWorkers }
 
 function TOmniThreadPool.SetMonitor(hWindow: THandle): IOmniThreadPool;

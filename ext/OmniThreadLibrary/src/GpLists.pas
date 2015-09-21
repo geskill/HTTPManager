@@ -4,7 +4,7 @@
 
 This software is distributed under the BSD license.
 
-Copyright (c) 2013, Primoz Gabrijelcic
+Copyright (c) 2014, Primoz Gabrijelcic
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
@@ -30,10 +30,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
    Author            : Primoz Gabrijelcic
    Creation date     : 2002-07-04
-   Last modification : 2013-03-11
-   Version           : 1.65
+   Last modification : 2014-10-13
+   Version           : 1.66
 </pre>*)(*
    History:
+     1.66: 2014-10-13
+       - Implemented TGpDoublyLinkedList.EnumerateAs<T>.
      1.65: 2013-03-11
        - Implemented TGpSkipList<T>.Remove.
      1.64: 2012-12-07
@@ -296,17 +298,23 @@ interface
 {$M-}
 
 uses
-  Windows,
   SysUtils,
   Classes,
-  Contnrs,
-  SyncObjs
-  {$IFDEF GpLists_HasSystemTypes},
-  System.Types
+  {$IFDEF GpLists_HasSystemTypes}
+  System.Types,
   {$ENDIF}
-  {$IFDEF Unicode},
-  Generics.Collections
-  {$ENDIF};
+  {$IFDEF MSWINDOWS}
+  Windows,
+  Contnrs,
+  DSiWin32,
+  {$ENDIF}
+  {$IFDEF POSIX}
+  Posix.Pthread,
+  {$ENDIF}
+  {$IFDEF Unicode}
+  Generics.Collections,
+  {$ENDIF}
+  SyncObjs;
 
 const
   CUpperListBound = MaxInt; //converted to Self.Count-1 inside Slice and Walk
@@ -351,6 +359,7 @@ type
   {:Boxed wide string.
     @since   2012-01-23
   }
+  {$IFDEF MSWINDOWS}
   TGpWideString = class
   private
     sValue: WideString;
@@ -358,6 +367,7 @@ type
     constructor Create(aValue: WideString = '');
     property Value: WideString read sValue write sValue;
   end; { TGpWideString }
+  {$ENDIF}
 
   {:Boxed real.
     @since   2007-04-17
@@ -877,6 +887,11 @@ type
   {:Integer list where each integer is accompanied with an object.
     @since   2003-06-09
   }
+  {$IFNDEF MSWINDOWS}
+  TObjectList = class(TObjectList<TObject>)
+  end;
+  {$ENDIF}
+
   TGpIntegerObjectList = class(TGpIntegerList, IGpIntegerObjectList)
   private
     iolObjects: TObjectList;
@@ -1449,6 +1464,7 @@ type
   {:AnsiString stream implementation, written by Remy Lebeau. Posted in the
     embarcadero.public.delphi.rtl newsgroup in 2011-05-18.
   }
+  {$IFDEF MSWINDOWS}
   TAnsiStringStream = class(TStream)
   private
     FDataString: AnsiString;
@@ -1464,6 +1480,7 @@ type
     procedure WriteString(const AString: AnsiString);
     property DataString: AnsiString read FDataString;
   end;
+  {$ENDIF}
 
   {$IFDEF GpLists_Enumerators}
   {:TGpTMethodList enumerator.
@@ -1613,6 +1630,7 @@ type
     property Items[idx: integer]: TClass read GetItems; default;
   end; { TGpClassList }
 
+  {$IFDEF MSWINDOWS}
   {$IFDEF GpLists_Enumerators}
   TGpObjectRingBuffer = class;
 
@@ -1628,7 +1646,9 @@ type
     property Current: TObject read GetCurrent;
   end; { TGpObjectRingBufferEnumerator }
   {$ENDIF GpLists_Enumerators}
+  {$ENDIF}
 
+  {$IFDEF MSWINDOWS}
   IGpObjectRingBuffer = interface ['{6DBFE065-87AF-47E5-AF03-92B07D5ACAC1}']
     function  GetBufferAlmostEmptyEvent: THandle;
     function  GetBufferAlmostEmptyThreshold: integer;
@@ -1667,10 +1687,12 @@ type
     property Items[iObject: integer]: TObject read GetItem write SetItem; default;
     property OwnsObjects: boolean read GetOwnsObjects;
   end; { IGpObjectRingBuffer }
+{$ENDIF}
 
   {:Fixed-size ring buffer of TObject references. Optionally thread-safe.
     @since   2003-07-25
   }
+{$IFDEF MSWINDOWS}
   TGpObjectRingBuffer = class(TInterfacedObject, IGpObjectRingBuffer)
   private
     orbBuffer                    : array of TObject;
@@ -1730,6 +1752,7 @@ type
     property Items[iObject: integer]: TObject read GetItem write SetItem; default;
     property OwnsObjects: boolean read orbOwnsObjects;
   end; { TGpObjectRingBuffer }
+{$ENDIF}
 
 {$IFDEF Unicode}
 {$IFNDEF GpLists_LimitedGenerics}
@@ -1771,6 +1794,7 @@ type
 
   {:Fixed-size ring buffer of T. Optionally thread-safe.
   }
+  {$IFDEF MSWINDOWS}
   TGpRingBuffer<T> = class(TInterfacedObject, IGpRingBuffer<T>)
   private
     orbBuffer                    : array of T;
@@ -1827,6 +1851,7 @@ type
   end; { TGpRingBuffer<T> }
 {$ENDIF ~GpLists_LimitedGenerics}
 {$ENDIF Unicode}
+{$ENDIF MSWINDOWS}
 
   {:Object map comparision function.
     @since   2003-08-02
@@ -1945,6 +1970,29 @@ type
     function  MoveNext: boolean;                    {$IFDEF GpLists_Inline}inline;{$ENDIF}
     property Current: TGpDoublyLinkedListObject read GetCurrent;
   end; { TGpDoublyLinkedListEnumerator }
+
+  {$IFDEF Unicode}
+  {$IFNDEF GpLists_LimitedGenerics}
+  TGpDoublyLinkedListEnumerator<T:TGpDoublyLinkedListObject> = class
+  private
+    dlleEnumerator: TGpDoublyLinkedListEnumerator;
+  public
+    constructor Create(dlList: TGpDoublyLinkedList);
+    destructor  Destroy; override;
+    function  GetCurrent: T;
+    function  MoveNext: boolean;
+    property Current: T read GetCurrent;
+  end; { TGpDoublyLinkedListEnumerator<T> }
+
+  TGpDoublyLinkedListEnumeratorFactory<T:TGpDoublyLinkedListObject> = class
+  private
+    dllefList: TGpDoublyLinkedList;
+  public
+    constructor Create(dlList: TGpDoublyLinkedList);
+    function  GetEnumerator: TGpDoublyLinkedListEnumerator<T>;
+  end; { TGpDoublyLinkedListEnumeratorFactory<T> }
+  {$ENDIF ~GpLists_LimitedGenerics}
+  {$ENDIF Unicode}
   {$ENDIF GpLists_Enumerators}
 
   IGpDoublyLinkedList = interface ['{586756F9-3EB6-4965-B796-5074DE52215A}']
@@ -1994,7 +2042,13 @@ type
     function  Count: integer;                               {$IFDEF GpLists_Inline}inline;{$ENDIF}
     procedure FreeAll;
     {$IFDEF GpLists_Enumerators}
-    function  GetEnumerator: TGpDoublyLinkedListEnumerator; {$IFDEF GpLists_Inline}inline;{$ENDIF}
+    function  GetEnumerator: TGpDoublyLinkedListEnumerator; overload; {$IFDEF GpLists_Inline}inline;{$ENDIF}
+    {$IFDEF Unicode}
+    {$IFNDEF GpLists_LimitedGenerics}
+    function EnumerateAs<T: TGpDoublyLinkedListObject>:
+      TGpDoublyLinkedListEnumeratorFactory<T>; overload;
+    {$ENDIF ~GpLists_LimitedGenerics}
+    {$ENDIF Unicode}
     {$ENDIF GpLists_Enumerators}
     function  Head: TGpDoublyLinkedListObject;
     procedure InsertAfter(existingObject: TGpDoublyLinkedListObject;
@@ -2376,11 +2430,13 @@ end; { TGpString.Create }
 
 { TGpWideString }
 
+{$IFDEF MSWINDOWS}
 constructor TGpWideString.Create(aValue: WideString);
 begin
   inherited Create;
   sValue := aValue;
 end; { TGpWideString.Create }
+{$ENDIF}
 
 { TGpReal }
 
@@ -3318,7 +3374,7 @@ end; { TGpInt64List.Delete }
 function TGpInt64List.Dump(baseAddr: pointer): pointer;
 var
   iList: integer;
-  pList: PLargeInteger;
+  pList: PInteger64;
 begin
   pList := baseAddr;
   pList^ := Count;
@@ -3585,7 +3641,7 @@ function TGpInt64List.Restore(baseAddr: pointer): pointer;
 var
   iList   : integer;
   numItems: integer;
-  pList   : {$IFDEF GpLists_RequiresD6CompilerHack} PInteger64 {$ELSE} PLargeInteger {$ENDIF};
+  pList   : PInteger64;
 begin
   pList := baseAddr;
   numItems := integer(pList^);
@@ -5343,6 +5399,7 @@ end; { TGpCountedStringList.SortByCounter }
 
 { TAnsiStringStream }
 
+{$IFDEF MSWINDOWS}
 constructor TAnsiStringStream.Create(const AString: AnsiString);
 begin
   inherited Create;
@@ -5400,6 +5457,7 @@ begin
   SetLength(FDataString, NewSize);
   if FPosition > NewSize then FPosition := NewSize;
 end;
+{$ENDIF}
 
 { TGpTMethodListEnumerator }
 
@@ -5668,6 +5726,7 @@ end; { TGpClassList.SetCapacity }
 
 {$IFDEF GpLists_Enumerators}
 
+{$IFDEF MSWINDOWS}
 { TGpObjectRingBufferEnumerator }
 
 constructor TGpObjectRingBufferEnumerator.Create(ringBuffer: TGpObjectRingBuffer);
@@ -5696,7 +5755,9 @@ begin
     Inc(rbeIndex);
 end; { TGpObjectRingBufferEnumerator.MoveNext }
 {$ENDIF GpLists_Enumerators}
+{$ENDIF}
 
+{$IFDEF MSWINDOWS}
 { TGpObjectRingBuffer }
 
 constructor TGpObjectRingBuffer.Create(bufferSize: integer; ownsObjects,
@@ -6199,6 +6260,7 @@ begin
 end; { TGpRingBuffer<T>.Unlock }
 {$ENDIF ~GpLists_LimitedGenerics}
 {$ENDIF Unicode}
+{$ENDIF}
 
 { TGpObjectMap }
 
@@ -6477,6 +6539,44 @@ begin
   Result := assigned(dlleElement);
 end; { TGpDoublyLinkedListEnumerator.MoveNext }
 
+{$IFDEF Unicode}
+{$IFNDEF GpLists_LimitedGenerics}
+constructor TGpDoublyLinkedListEnumerator<T>.Create(dlList: TGpDoublyLinkedList);
+begin
+  inherited Create;
+  dlleEnumerator := TGpDoublyLinkedListEnumerator.Create(dlList);
+end; { TGpDoublyLinkedListEnumerator<T>.Create }
+
+destructor TGpDoublyLinkedListEnumerator<T>.Destroy;
+begin
+  FreeAndNil(dlleEnumerator);
+  inherited;
+end; { TGpDoublyLinkedListEnumerator<T>.Destroy }
+
+function TGpDoublyLinkedListEnumerator<T>.GetCurrent: T;
+begin
+  Result := T(dlleEnumerator.GetCurrent);
+end; { TGpDoublyLinkedListEnumerator<T>.GetCurrent }
+
+function TGpDoublyLinkedListEnumerator<T>.MoveNext: boolean;
+begin
+  Result := dlleEnumerator.MoveNext;
+end; { TGpDoublyLinkedListEnumerator<T>.MoveNext }
+
+constructor TGpDoublyLinkedListEnumeratorFactory<T>.Create(dlList: TGpDoublyLinkedList);
+begin
+  inherited Create;
+  dllefList := dlList;
+end; { TGpDoublyLinkedListEnumeratorFactory<T>.Create }
+
+function TGpDoublyLinkedListEnumeratorFactory<T>.GetEnumerator:
+  TGpDoublyLinkedListEnumerator<T>;
+begin
+  Result := TGpDoublyLinkedListEnumerator<T>.Create(dllefList);
+end; { TGpDoublyLinkedListEnumeratorFactory<T>.GetEnumerator }
+{$ENDIF ~GpLists_LimitedGenerics}
+{$ENDIF Unicode}
+
 {$ENDIF GpLists_Enumerators}
 
 { TGpDoublyLinkedList }
@@ -6513,6 +6613,17 @@ class function TGpDoublyLinkedList.CreateInterface(multithreaded: boolean):
 begin
   Result := TGpDoublyLinkedList.Create(multithreaded);
 end; { TGpDoublyLinkedList.CreateInterface }
+
+{$IFDEF GpLists_Enumerators}
+{$IFDEF Unicode}
+{$IFNDEF GpLists_LimitedGenerics}
+function TGpDoublyLinkedList.EnumerateAs<T>: TGpDoublyLinkedListEnumeratorFactory<T>;
+begin
+  Result := TGpDoublyLinkedListEnumeratorFactory<T>.Create(Self);
+end; { TGpDoublyLinkedList.EnumerateAs<T> }
+{$ENDIF}
+{$ENDIF}
+{$ENDIF}
 
 {:Destroy all elements of the list.
   @since   2005-06-02

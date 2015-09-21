@@ -3,7 +3,7 @@
 ///<license>
 ///This software is distributed under the BSD license.
 ///
-///Copyright (c) 2013, Primoz Gabrijelcic
+///Copyright (c) 2015, Primoz Gabrijelcic
 ///All rights reserved.
 ///
 ///Redistribution and use in source and binary forms, with or without modification,
@@ -37,10 +37,28 @@
 ///   Contributors      : GJ, Lee_Nover, scarre
 ///
 ///   Creation date     : 2008-06-12
-///   Last modification : 2013-10-17
-///   Version           : 1.32b
+///   Last modification : 2015-08-30
+///   Version           : 1.37b
 ///</para><para>
 ///   History:
+///     1.37b: 2015-08-30
+///       - Fixed record type handling in FromArray<T> and ToArray<T>.
+///     1.37a: 2015-04-17
+///       - Added vtWideChar and vtPWideChar handling to TOmniValue.Create and .CreateNamed.
+///     1.37: 2015-02-09
+///       - Added writer for TOmniExecutable.Delegate.
+///     1.36: 2015-02-03
+///       - Type of TOmniValue data is now an external type - TOmniValueDataType. That
+///         way causes less internal errors in the compiler.
+///       - Added TOmniValue.DataType property.
+///     1.35: 2014-09-23
+///       - Implemented TOmniValueContainer.AssignNamed.
+///     1.34: 2014-01-13
+///       - Implemented TOmniValue.HasArrayItem.
+///     1.33: 2014-01-10
+///       - TOmniValue can 'own' a TObject (object gets destroyed when a TOmniValue goes
+///         out of scope). Supporting properties: IsOwnedObject, AsOwnedObject,
+///         OwnsObject.
 ///     1.32b: 2013-10-17
 ///       - Fixed exception format string in TOmniValue.SetAsTValue.
 ///     1.32a: 2013-10-14
@@ -236,13 +254,16 @@ type
   TOmniValueContainer = class;
   IOmniAutoDestroyObject = interface;
 
+
+  TOmniValueDataType = (ovtNull,
+           {ovData} ovtBoolean, ovtInteger, ovtDouble, ovtObject, ovtPointer, ovtDateTime, ovtException,
+           {ovIntf} ovtExtended, ovtString, ovtInterface, ovtVariant, ovtWideString, ovtArray, ovtRecord, ovtAnsiString, ovtOwnedObject);
+
   TOmniValue = packed record // 13 bytes in 32-bit, 17 bytes in 64-bits
   private
     ovData: int64;
     ovIntf: IInterface;
-    ovType: (ovtNull,
-             {ovData} ovtBoolean, ovtInteger, ovtDouble, ovtObject, ovtPointer, ovtDateTime, ovtException,
-             {ovIntf} ovtExtended, ovtString, ovtInterface, ovtVariant, ovtWideString, ovtArray, ovtRecord, ovtAnsiString);
+    ovType: TOmniValueDataType;
     function  CastToAnsiString: AnsiString; inline;
     function  CastToBoolean: boolean; inline;
     function  CastToCardinal: cardinal; inline;
@@ -262,12 +283,20 @@ type
     function  GetAsArray: TOmniValueContainer; inline;
     function  GetAsArrayItem(idx: integer): TOmniValue; overload; {$IF CompilerVersion >= 22}inline;{$IFEND}
     function  GetAsArrayItem(const name: string): TOmniValue; overload; {$IF CompilerVersion >= 22}inline;{$IFEND}
+    {$IF CompilerVersion >= 19}//D2007 has problems understanding this overload
     function  GetAsArrayItem(const param: TOmniValue): TOmniValue; overload; {$IF CompilerVersion >= 22}inline;{$IFEND}
+    //GetAsArrayItemOV is used in D2007 instead
+    {$IFEND}
+    function  GetAsArrayItemOV(const param: TOmniValue): TOmniValue; overload; {$IF CompilerVersion >= 22}inline;{$IFEND}
     procedure SetAsAnsiString(const value: AnsiString);
     procedure SetAsArray(value: TOmniValueContainer); inline;
     procedure SetAsArrayItem(idx: integer; const value: TOmniValue); overload; {$IF CompilerVersion >= 22}inline;{$IFEND}
     procedure SetAsArrayItem(const name: string; const value: TOmniValue); overload; {$IF CompilerVersion >= 22}inline;{$IFEND}
+    {$IF CompilerVersion >= 19}//D2007 has problems understanding this overload
     procedure SetAsArrayItem(const param, value: TOmniValue); overload; {$IF CompilerVersion >= 22}inline;{$IFEND}
+    //SetAsArrayItemOV is used in D2007 instead
+    {$IFEND}
+    procedure SetAsArrayItemOV(const param, value: TOmniValue); overload; {$IF CompilerVersion >= 22}inline;{$IFEND}
     procedure SetAsBoolean(const value: boolean); inline;
     procedure SetAsCardinal(const value: cardinal); inline;
     procedure SetAsDouble(value: Double); inline;
@@ -278,20 +307,21 @@ type
     procedure SetAsInteger(const value: integer); inline;
     procedure SetAsInterface(const value: IInterface); //don't inline, something is broken in codegen (XE)
     procedure SetAsObject(const value: TObject); inline;
+    procedure SetAsOwnedObject(const value: TObject); inline;
     procedure SetAsPointer(const value: pointer); inline;
     procedure SetAsRecord(const intf: IOmniAutoDestroyObject); inline;
     procedure SetAsString(const value: string);
     procedure SetAsVariant(const value: Variant);
     procedure SetAsWideString(const value: WideString);
+    procedure SetOwnsObject(const value: boolean);
   private
     {$REGION 'Documentation'}
     ///  <summary>Most of the code in this method never executes. It is just here so that
-    ///  stupid "Private symbol 'GetAsArrayItem' declared but never used" compilation hint
-    /// is not shown.</summary>
+    ///  stupid compilation hints such as "Private symbol 'GetAsArrayItem' declared but
+    ///  never used" are not shown.</summary>
     {$ENDREGION}
     class procedure _RemoveWarnings; inline; static;
     procedure ClearIntf; inline;
-    function  IsInterfacedType: boolean; inline;
   public
     constructor Create(const values: array of const);
     constructor CreateNamed(const values: array of const; const cppDupConWorkaround: boolean = false);
@@ -314,6 +344,9 @@ type
     function  CastToVariantDef(defValue: Variant): Variant; inline;
     function  CastToWideStringDef(defValue: WideString): WideString; inline;
     procedure Clear; inline;
+    function  HasArrayItem(idx: integer): boolean; overload; inline;
+    function  HasArrayItem(const name: string): boolean; overload; inline;
+    function  HasArrayItem(const param: TOmniValue): boolean; overload; inline;
     function  IsAnsiString: boolean; inline;
     function  IsArray: boolean; inline;
     function  IsBoolean: boolean; inline;
@@ -323,7 +356,9 @@ type
     function  IsDateTime: boolean; inline;
     function  IsInteger: boolean; inline;
     function  IsInterface: boolean; inline;
+    function  IsInterfacedType: boolean; inline;
     function  IsObject: boolean; inline;
+    function  IsOwnedObject: boolean; inline;
     function  IsPointer: boolean; inline;
     function  IsRecord: boolean; inline;
     function  IsString: boolean; inline;
@@ -385,7 +420,10 @@ type
     property AsArray: TOmniValueContainer read GetAsArray;
     property AsArrayItem[idx: integer]: TOmniValue read GetAsArrayItem write SetAsArrayItem; default;
     property AsArrayItem[const name: string]: TOmniValue read GetAsArrayItem write SetAsArrayItem; default;
+    {$IF CompilerVersion >= 19}//D2007 has problems understanding this overload
     property AsArrayItem[const param: TOmniValue]: TOmniValue read GetAsArrayItem write SetAsArrayItem; default;
+    {$IFEND}
+    property AsArrayItemOV[const param: TOmniValue]: TOmniValue read GetAsArrayItemOV write SetAsArrayItemOV; 
     property AsAnsiString: AnsiString read CastToAnsiString write SetAsAnsiString;
     property AsBoolean: boolean read CastToBoolean write SetAsBoolean;
     property AsCardinal: cardinal read CastToCardinal write SetAsCardinal;
@@ -397,16 +435,19 @@ type
     property AsInteger: integer read CastToInteger write SetAsInteger;
     property AsInterface: IInterface read CastToInterface write SetAsInterface;
     property AsObject: TObject read CastToObject write SetAsObject;
+    property AsOwnedObject: TObject read CastToObject write SetAsOwnedObject;
     property AsPointer: pointer read CastToPointer write SetAsPointer;
     property AsString: string read CastToString write SetAsString;
     property AsVariant: Variant read CastToVariant write SetAsVariant;
     property AsWideString: WideString read CastToWideString write SetAsWideString;
+    property DataType: TOmniValueDataType read ovType;
+    property OwnsObject: boolean read IsOwnedObject write SetOwnsObject;
   {$IFDEF OTL_Generics}
   public
     class function CastFrom<T>(const value: T): TOmniValue; static;
     function  CastTo<T>: T;
     class function FromRecord<T: record>(const value: T): TOmniValue; static;
-    function  ToRecord<T: record>: T;
+    function  ToRecord<T>: T;
     {$IFDEF OTL_HasArrayOfT}
     class function FromArray<T>(const values: TArray<T>): TOmniValue; static;
     function  ToArray<T>: TArray<T>;
@@ -517,6 +558,7 @@ type
     constructor Create;
     procedure Add(const paramValue: TOmniValue; paramName: string = '');
     procedure Assign(const parameters: array of TOmniValue);
+    procedure AssignNamed(const parameters: array of TOmniValue);
     function  ByName(const paramName: string): TOmniValue; overload;
     function  ByName(const paramName: string; const defValue: TOmniValue): TOmniValue; overload;
     function  Count: integer;
@@ -652,6 +694,7 @@ type
   strict private
     {$IFDEF OTL_Anonymous}
     oeDelegate: TProc;
+    procedure SetAnonDelegate(const value: TProc); inline;
     function  GetDelegate: TProc; inline;
     {$ENDIF OTL_Anonymous}
   strict private
@@ -685,7 +728,7 @@ type
     class operator Implicit(const a: TOmniExecutable): TProc; inline;
     class operator Implicit(const a: TProc): TOmniExecutable; inline;
     procedure SetDelegate(const source);
-    property Delegate: TProc read GetDelegate;
+    property Delegate: TProc read GetDelegate write SetAnonDelegate;
     {$ENDIF OTL_Anonymous}
   end; { TOmniExecutable }
 
@@ -712,7 +755,7 @@ type
   end; { TOmniMessageID }
 
 {$IFDEF OTL_Generics}
-  TOmniRecordWrapper<T: record> = class
+  TOmniRecordWrapper<T> = class
   strict private
     FValue: T;
   public
@@ -740,10 +783,7 @@ type
 
 var
   OtlUID: TGp8AlignedInt64;
-
-  {$IFDEF OTL_Generics} // must not be local due to compiler restrictions
   TOmniValue_DataSize: array [TTypeKind] of integer;
-  {$ENDIF OTL_Generics}
 
 implementation
 
@@ -1029,6 +1069,15 @@ begin
   Result := {$IFDEF OTL_StrPasInAnsiStrings}System.AnsiStrings.{$ENDIF}StrPas(Str);
 end; { StrPasA }
 
+function StrPasW(const Str: PWideChar): string;
+begin
+  {$IFDEF Unicode}
+  Result := StrPas(Str);
+  {$ELSE}
+  Result := WideCharToString(Str);
+  {$ENDIF}
+end; { StrPasW }
+
 {$IFDEF OTL_Generics}
 { TOmniRecordWrapper }
 
@@ -1113,6 +1162,24 @@ begin
   for value in parameters do
     Add(value);
 end; { TOmniValueContainer.Assign }
+
+procedure TOmniValueContainer.AssignNamed(const parameters: array of TOmniValue);
+var
+  i: integer;
+begin
+  if not ovcCanModify then
+    raise Exception.Create('TOmniValueContainer.AssignNamed: Already locked');
+  if Odd(Length(parameters)) then
+    raise Exception.Create('TOmniValueContainer.AssignNamed: Not a proper number of parameters');
+  Clear;
+  Grow(Length(parameters) div 2 - 1);
+
+  i := Low(parameters);
+  while i < High(parameters) do begin
+    Add(parameters[i+1], parameters[i]);
+    Inc(i, 2);
+  end;
+end; { TOmniValueContainer.AssignNamed }
 
 function TOmniValueContainer.ByName(const paramName: string): TOmniValue;
 begin
@@ -1552,11 +1619,13 @@ begin
         vtInteger:       ovc.Add(VInteger);
         vtBoolean:       ovc.Add(VBoolean);
         vtChar:          ovc.Add(string(VChar));
+        vtWideChar:      ovc.Add(string(VWideChar));
         vtExtended:      ovc.Add(VExtended^);
+        vtAnsiString:    ovc.Add(AnsiString(VAnsiString));
         vtString:        ovc.Add(string(VString^));
         vtPointer:       ovc.Add(VPointer);
         vtPChar:         ovc.Add(string(StrPasA(VPChar)));
-        vtAnsiString:    ovc.Add(AnsiString(VAnsiString));
+        vtPWideChar:     ovc.Add(StrPasW(VPWideChar));
         vtCurrency:      ovc.Add(VCurrency^);
         vtVariant:       ovc.Add(VVariant^);
         vtObject:        ovc.Add(VObject);
@@ -1588,10 +1657,12 @@ begin
     with values[i] do begin
       if not Odd(i) then
         case VType of
-          vtChar:          name := string(VChar);
-          vtString:        name := string(VString^);
-          vtPChar:         name := string(StrPasA(VPChar));
           vtAnsiString:    name := string(VAnsiString);
+          vtString:        name := string(VString^);
+          vtChar:          name := string(VChar);
+          vtWideChar:      name := string(VWideChar);
+          vtPChar:         name := string(StrPasA(VPChar));
+          vtPWideChar:     name := string(StrPasW(VPWideChar));
           vtVariant:       name := string(VVariant^);
           vtWideString:    name := WideString(VWideString);
           {$IFDEF UNICODE}
@@ -1605,11 +1676,13 @@ begin
           vtInteger:       ovc.Add(VInteger, name);
           vtBoolean:       ovc.Add(VBoolean, name);
           vtChar:          ovc.Add(string(VChar), name);
+          vtWideChar:      ovc.Add(VWideChar, name);
           vtExtended:      ovc.Add(VExtended^, name);
+          vtAnsiString:    ovc.Add(AnsiString(VAnsiString), name);
           vtString:        ovc.Add(string(VString^), name);
           vtPointer:       ovc.Add(VPointer, name);
           vtPChar:         ovc.Add(string(StrPasA(VPChar)), name);
-          vtAnsiString:    ovc.Add(AnsiString(VAnsiString), name);
+          vtPWideChar:     ovc.Add(StrPasW(VPWideChar), name);
           vtCurrency:      ovc.Add(VCurrency^, name);
           vtVariant:       ovc.Add(VVariant^, name);
           vtObject:        ovc.Add(VObject, name);
@@ -1661,12 +1734,16 @@ begin
       ds := 2
     else
       ds := TOmniValue_DataSize[ti^.Kind];
-  if ds = 0 then // complicated stuff
-    {$IFDEF OTL_ERTTI}
-    Result := AsTValue.AsType<T>
-    {$ELSE}
-    raise Exception.Create('Only casting to simple types is supported in Delphi 2009')
-    {$ENDIF OTL_ERTTI}
+  if ds = 0 then begin // complicated stuff
+    if ti.Kind = tkRecord then
+      Result := TOmniRecordWrapper<T>(CastToRecord.Value).Value
+    else
+      {$IFDEF OTL_ERTTI}
+      Result := AsTValue.AsType<T>
+      {$ELSE}
+      raise Exception.Create('Only casting to simple types is supported in Delphi 2009')
+      {$ENDIF OTL_ERTTI}
+  end
   else begin // simple types
     if ds < 8 then begin
       maxValue := uint64($FF) SHL ((ds-1) * 8);
@@ -1693,12 +1770,16 @@ begin
     else
       ds := TOmniValue_DataSize[ti^.Kind];
   end;
-  if ds = 0 then // complicated stuff
-    {$IFDEF OTL_ERTTI}
-    Result.AsTValue := TValue.From<T>(value)
-    {$ELSE}
-    raise Exception.Create('Only casting from simple types is supported in Delphi 2009')
-    {$ENDIF OTL_ERTTI}
+  if ds = 0 then begin // complicated stuff
+    if ti^.Kind = tkRecord then
+      Result.SetAsRecord(CreateAutoDestroyObject(TOmniRecordWrapper<T>.Create(value)))
+    else
+      {$IFDEF OTL_ERTTI}
+      Result.AsTValue := TValue.From<T>(value)
+      {$ELSE}
+      raise Exception.Create('Only casting from simple types is supported in Delphi 2009')
+      {$ENDIF OTL_ERTTI}
+  end
   else begin // simple types
     data := 0;
     Move(value, data, ds);
@@ -1785,12 +1866,45 @@ begin
   Result := TOmniValueContainer(ovData)[name];
 end; { TOmniValue.GetAsArrayItem }
 
+{$IF CompilerVersion >= 19}//D2007 has problems understanding this overload
 function TOmniValue.GetAsArrayItem(const param: TOmniValue): TOmniValue;
 begin
   if not IsArray then
     raise Exception.Create('TOmniValue does not contain an array');
   Result := TOmniValueContainer(ovData)[param];
 end; { TOmniValue.GetAsArrayItem }
+{$IFEND}
+
+function TOmniValue.GetAsArrayItemOV(const param: TOmniValue): TOmniValue;
+begin
+  if not IsArray then
+    raise Exception.Create('TOmniValue does not contain an array');
+  Result := TOmniValueContainer(ovData)[param];
+end; { TOmniValue.GetAsArrayItemOV }
+
+function TOmniValue.HasArrayItem(idx: integer): boolean;
+begin
+  if not IsArray then
+    raise Exception.Create('TOmniValue does not contain an array');
+  Result := (idx >= 0) and (idx < TOmniValueContainer(ovData).Count);
+end; { TOmniValue.HasArrayItem }
+
+function TOmniValue.HasArrayItem(const name: string): boolean;
+begin
+  if not IsArray then
+    raise Exception.Create('TOmniValue does not contain an array');
+  Result := (TOmniValueContainer(ovData).IndexOf(name) >= 0);
+end; { TOmniValue.HasArrayItem }
+
+function TOmniValue.HasArrayItem(const param: TOmniValue): boolean;
+begin
+  if param.IsInteger then
+    Result := HasArrayItem(param.AsInteger)
+  else if param.IsString then
+    Result := HasArrayItem(param.AsString)
+  else
+    raise Exception.Create('TOmniValue does not contain an array');
+end; { TOmniValue.HasArrayItem }
 
 function TOmniValue.GetAsArrayItem(idx: integer): TOmniValue;
 begin
@@ -1945,7 +2059,7 @@ function TOmniValue.CastToRecord: IOmniAutoDestroyObject;
 begin
   case ovType of
     ovtRecord: Result := IOmniAutoDestroyObject(ovIntf);
-    else raise Exception.Create('TOmniValue cannot be converted to string');
+    else raise Exception.Create('TOmniValue cannot be converted to record');
   end;
 end; { TOmniValue.CastToRecord }
 
@@ -2033,6 +2147,8 @@ begin
       Result := AsString;
     ovtObject:
       Result := AsObject;
+    ovtOwnedObject:
+      Result := AsOwnedObject;
     ovtException:
       Result := AsException;
     ovtInterface:
@@ -2128,6 +2244,11 @@ begin
   Result := (ovType = ovtObject);
 end; { TOmniValue.IsObject }
 
+function TOmniValue.IsOwnedObject: boolean;
+begin
+  Result := (ovType = ovtOwnedObject);
+end; { TOmniValue.IsOwnedObject }
+
 function TOmniValue.IsPointer: boolean;
 begin
   Result := (ovType = ovtPointer);
@@ -2179,11 +2300,15 @@ begin
   a := 0;
   if a = (a + 1) then begin
     ov := ov.GetAsArrayItem('');
-    ov := ov.GetAsArrayItem(ov);
+    ov := ov.GetAsArrayItemOV(ov);
     ov.SetAsArrayItem('', 0);
-    ov.SetAsArrayItem(ov, 0);
+    ov.SetAsArrayItemOV(ov, 0);
     intf := ov.CastToRecord;
     ov.SetAsRecord(intf);
+    {$IF CompilerVersion >= 19}
+    ov := ov.GetAsArrayItem(ov);
+    ov.SetAsArrayItem(ov, 0);
+    {$IFEND}
   end;
 end; { TOmniValue._RemoveWarnings }
 
@@ -2218,6 +2343,7 @@ begin
   TOmniValueContainer(ovData)[name] := value;
 end; { TOmniValue.SetAsArrayItem }
 
+{$IF CompilerVersion >= 19}//D2007 has problems understanding this overload
 procedure TOmniValue.SetAsArrayItem(const param, value: TOmniValue);
 begin
   if IsEmpty then
@@ -2226,6 +2352,16 @@ begin
     raise Exception.Create('TOmniValue does not contain an array');
   TOmniValueContainer(ovData)[param] := value;
 end; { TOmniValue.SetAsArrayItem }
+{$IFEND}
+
+procedure TOmniValue.SetAsArrayItemOV(const param, value: TOmniValue);
+begin
+  if IsEmpty then
+    SetAsArray(TOmniValueContainer.Create);
+  if not IsArray then
+    raise Exception.Create('TOmniValue does not contain an array');
+  TOmniValueContainer(ovData)[param] := value;
+end; { TOmniValue.SetAsArrayItemOV }
 
 { TOmniValue.SetAsArrayItem }
 
@@ -2292,6 +2428,13 @@ begin
   PInt64(@ovData)^ := int64(value);
   ovType := ovtObject;
 end; { TOmniValue.SetAsObject }
+
+procedure TOmniValue.SetAsOwnedObject(const value: TObject);
+begin
+  ovType := ovtOwnedObject;
+  ovIntf := AutoDestroyObject(value);
+  ovData := int64(value);
+end; { TOmniValue.SetAsOwnedObject }
 
 procedure TOmniValue.SetAsPointer(const value: pointer);
 begin
@@ -2360,6 +2503,23 @@ begin
   ovType := ovtWideString;
 end; { TOmniValue.SetAsWideString }
 
+procedure TOmniValue.SetOwnsObject(const value: boolean);
+var
+  obj: TObject;
+begin
+  if value then begin
+    if not IsObject then
+      raise Exception.Create('TOmniValue does not contain an object');
+    SetAsOwnedObject(TObject(ovData));
+  end
+  else begin
+    if not IsOwnedObject then
+      raise Exception.Create('TOmniValue does not contain an owned object');
+    obj := (ovIntf as IGpAutoDestroyObject).Detach;
+    SetAsObject(obj);
+  end;
+end; { TOmniValue.SetOwnsObject }
+
 function TOmniValue.TryCastToAnsiString(var value: AnsiString): boolean;
 begin
   Result := true;
@@ -2404,7 +2564,7 @@ begin
     ovtDouble,
     ovtDateTime: value := PDouble(@ovData)^;
     ovtExtended: value := (ovIntf as IOmniExtendedData).Value;
-    ovtNull: value := 0;
+    ovtNull:     value := 0;
     else Result := false;
   end;
 end; { TOmniValue.TryCastToDateTime }
@@ -2414,7 +2574,7 @@ begin
   Result := true;
   case ovType of
     ovtInteger,
-    ovtNull:  value := AsInt64;
+    ovtNull:     value := AsInt64;
     ovtDouble,
     ovtDateTime: value := PDouble(@ovData)^;
     ovtExtended: value := (ovIntf as IOmniExtendedData).Value;
@@ -2440,7 +2600,7 @@ begin
   Result := true;
   case ovType of
     ovtInteger,
-    ovtNull:  value := AsInt64;
+    ovtNull:     value := AsInt64;
     ovtDouble,
     ovtDateTime: value := PDouble(@ovData)^;
     ovtExtended: value  := (ovIntf as IOmniExtendedData).Value;
@@ -2453,7 +2613,7 @@ begin
   Result := true;
   case ovType of
     ovtInteger: value := ovData;
-    ovtNull: value := 0;
+    ovtNull:    value := 0;
     ovtVariant: value := integer(AsVariant);
     else Result := false;
   end;
@@ -2473,7 +2633,7 @@ begin
   Result := true;
   case ovType of
     ovtInterface: value := ovIntf;
-    ovtNull: value := nil;
+    ovtNull:      value := nil;
     else Result := false;
   end;
 end; { TOmniValue.TryCastToInterface }
@@ -2483,8 +2643,9 @@ begin
   Result := true;
   case ovType of
     ovtObject,
-    ovtException: value := TObject(ovData);
-    ovtNull: value := nil;
+    ovtException:   value := TObject(ovData);
+    ovtOwnedObject: value := (ovIntf as IGpAutoDestroyObject).Obj;
+    ovtNull:        value := nil;
     else Result := false;
   end;
 end; { TOmniValue.TryCastToObject }
@@ -2495,8 +2656,9 @@ begin
   case ovType of
     ovtPointer,
     ovtObject,
-    ovtException: value := pointer(ovData);
-    ovtNull: value := nil;
+    ovtException:   value := pointer(ovData);
+    ovtOwnedObject: value := pointer((ovIntf as IGpAutoDestroyObject).Obj);
+    ovtNull:        value := nil;
     else Result := false;
   end;
 end; { TOmniValue.TryCastToPointer }
@@ -2524,7 +2686,7 @@ begin
   Result := true;
   case ovType of
     ovtVariant: value := (ovIntf as IOmniVariantData).Value;
-    ovtNull: value := Variants.Null;
+    ovtNull:    value := Variants.Null;
     else Result := false;
   end;
 end; { TOmniValue.TryCastToVariant }
@@ -2536,7 +2698,7 @@ begin
   Result := true;
   case ovType of
     ovtWideString: value := (ovIntf as IOmniWideStringData).Value;
-    ovtVariant: value := WideString(AsVariant);
+    ovtVariant:    value := WideString(AsVariant);
     else begin
       Result := TryCastToString(str);
       if Result then
@@ -3193,6 +3355,12 @@ begin
   CheckKind(oekDelegate);
   Result := oeDelegate;
 end; { TOmniExecutable.GetDelegate }
+
+procedure TOmniExecutable.SetAnonDelegate(const value: TProc);
+begin
+  oeDelegate := value;
+  oeKind := oekDelegate;
+end; { TOmniExecutable.SetAnonDelegate }
 
 procedure TOmniExecutable.SetDelegate(const source);
 begin

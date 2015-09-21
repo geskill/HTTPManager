@@ -4,7 +4,7 @@
 ///<license>
 ///This software is distributed under the BSD license.
 ///
-///Copyright (c) 2014, Primoz Gabrijelcic
+///Copyright (c) 2015, Primoz Gabrijelcic
 ///All rights reserved.
 ///
 ///Redistribution and use in source and binary forms, with or without modification,
@@ -38,10 +38,38 @@
 ///   Contributors      : GJ, Lee_Nover, dottor_jeckill
 ///
 ///   Creation date     : 2009-03-30
-///   Last modification : 2014-01-09
-///   Version           : 1.16
+///   Last modification : 2015-09-04
+///   Version           : 1.22a
 ///</para><para>
 ///   History:
+///     1.22b: 2015-09-07
+///       - TWaitFor.MsgWaitAny now uses RegisterWaitForSingleObject approach when
+///         waiting on 64 handles. Previously, MsgWaitForMultipleObjectsEx was called,
+///         which can only handle up to 63 handles.
+///     1.22a: 2015-09-04
+///       - Fixed a bug in TWaitFor: When the code was waiting on less than 64 handles
+///         and timeout occurred, the Signalled[] property was not always empty.
+///       - Fixed: TWaitFor was not working correctly with more than 64 handles if
+///         it was created with the parameter-less constructor.
+///     1.22: 2015-07-27
+///       - Implemented TOmniSingleThreadUseChecker.AttachToThread which forcibly
+///         attaches thread checker to the current thread even if it was used
+///         from another thread before.
+///     1.21: 2015-07-10
+///       - Implemented TOmniSingleThreadUseChecker, a record which checks that the
+///         owner is only used from one thread. See OtlComm/TOmniCommunicationEndpoint
+///         for an example.
+///     1.20: 2015-04-17
+///       - TOmniCS.GetLockCount won't crash if Initialize was not called yet.
+///     1.19: 2014-11-04
+///       - TWaitForAll renamed to TWaitFor.
+///       - TWaitFor.Wait renamed to TWaitFor.WaitAll.
+///       - Implemented TWaitFor.MsgWaitAny and .WaitAny.
+///       - Implemented WaitForAnyObject.
+///     1.18: 2014-11-03
+///       - Implemented WaitForAllObjects and TWaitForAll class.
+///     1.17: 2014-01-11
+///       - Implemented TOmniMREW.TryEnterReadLock and TryEnterWriteLock.
 ///     1.16: 2014-01-09
 ///       - Locked<T>.Free can be called if Locked<T> owns its Value.
 ///     1.15: 2013-03-05
@@ -171,12 +199,14 @@ type
     procedure EnterWriteLock; inline;
     procedure ExitReadLock; inline;
     procedure ExitWriteLock; inline;
+    function  TryEnterReadLock: boolean; inline;
+    function  TryEnterWriteLock: boolean; inline;
   end; { TOmniMREW }
 
   IOmniResourceCount = interface ['{F5281539-1DA4-45E9-8565-4BEA689A23AD}']
     function  GetHandle: THandle;
     //
-    function  Allocate: cardinal; 
+    function  Allocate: cardinal;
     function  Release: cardinal;
     function  TryAllocate(var resourceCount: cardinal; timeout_ms: cardinal = 0): boolean;
     property Handle: THandle read GetHandle;
@@ -184,7 +214,9 @@ type
 
   ///<summary>Kind of an inverse semaphore. Gets signalled when count drops to 0.
   ///   Allocate decrements the count (and blocks if initial count is 0), Release
-  ///   increments the count.</summary>
+  ///   increments the count.
+  ///   Threadsafe.
+  ///</summary>
   ///<since>2009-12-30</since>
   TOmniResourceCount = class(TInterfacedObject, IOmniResourceCount)
   strict private
@@ -256,7 +288,7 @@ type
   IOmniLockManager<K> = interface
     function  Lock(const key: K; timeout_ms: cardinal): boolean;
     function  LockUnlock(const key: K; timeout_ms: cardinal): IOmniLockManagerAutoUnlock;
-    function  Unlock(const key: K): boolean;
+    procedure Unlock(const key: K);
   end; { IOmniLockManager<K> }
 
   TOmniLockManager<K> = class(TInterfacedObject, IOmniLockManager<K>)
@@ -294,9 +326,103 @@ type
     destructor  Destroy; override;
     function  Lock(const key: K; timeout_ms: cardinal): boolean;
     function  LockUnlock(const key: K; timeout_ms: cardinal): IOmniLockManagerAutoUnlock;
-    function  Unlock(const key: K): boolean;
+    procedure Unlock(const key: K);
   end; { TOmniLockManager<K> }
   {$ENDIF OTL_Generics}
+
+  ///<summary>Waits on any/all from any number of handles.</summary>
+  ///  Don't use it to wait on mutexes!
+  ///  http://joeduffyblog.com/2007/05/13/registerwaitforsingleobject-and-mutexes-dont-mix/
+  TWaitFor = class
+  private type
+    TWaitMode = (wmSmart, wmForceWFM, wmForceRWFS);
+  protected type //must be visible from the callback
+    TWaiter = class
+    strict private
+      FIdxHandle: integer;
+      FOwner    : TWaitFor;
+      FSignalled: boolean;
+    public
+      constructor Create(owner: TWaitFor; idxHandle: integer);
+      procedure Awaited;
+      property Index: integer read FIdxHandle;
+      property Signalled: boolean read FSignalled write FSignalled;
+    end;
+  public type
+    TWaitResult = (
+      waAwaited,      // WAIT_OBJECT_0 .. WAIT_OBJECT_n
+      waTimeout,      // WAIT_TIMEOUT
+      waFailed,       // WAIT_FAILED
+      waIOCompletion  // WAIT_IO_COMPLETION
+    );
+    THandleInfo = record
+      Index: integer;
+    end;
+    THandles = array of THandleInfo;
+    THandleArr = array of THandle;
+  strict private
+    FAwaitedLock     : TOmniCS;
+    FHandles         : array of THandle;
+    FIdxSignalled    : integer;
+    FResourceCount   : IOmniResourceCount;
+    FSignal          : TDSiEventHandle;
+    FSignalledHandles: THandles;
+    FWaitHandles     : TGpInt64ObjectList;
+    FWaitMode        : TWaitMode; // for testing
+  strict protected
+    function  GetWaitHandles: THandleArr;
+    function  MapToHandle(winResult: cardinal): cardinal;
+    function  MapToResult(winResult: cardinal): TWaitResult;
+    procedure RegisterWaitHandles(extraFlags: cardinal);
+    procedure UnregisterWaitHandles;
+  protected //must be visible from the callback
+    procedure Awaited_Asy(idxHandle: integer);
+  public
+    constructor Create; overload;
+    constructor Create(const handles: array of THandle); overload;
+    destructor  Destroy; override;
+    function  MsgWaitAny(timeout_ms, wakeMask, flags: cardinal): TWaitResult;
+    procedure SetHandles(const handles: array of THandle);
+    function  WaitAll(timeout_ms: cardinal): TWaitResult;
+    function  WaitAny(timeout_ms: cardinal; alertable: boolean = false): TWaitResult;
+    property Signalled: THandles read FSignalledHandles;
+    property WaitHandles: THandleArr read GetWaitHandles;
+  end; { TWaitFor }
+
+  TOmniSingleThreadUseChecker = record
+  {$IFDEF MSWINDOWS}
+  private
+    FLock    : TOmniCS;
+    FThreadID: cardinal;
+  {$ENDIF MSWINDOWS}
+  public
+    procedure AttachToCurrentThread; inline;
+    procedure Check; inline;
+    procedure DebugCheck; inline;
+  end; { TOmniSingleThreadUseChecker }
+
+{$IFDEF OTL_NeedsWindowsAPIs}
+  TWaitOrTimerCallback = procedure (Context: Pointer; Success: Boolean) stdcall;
+  BOOL = LongBool;
+  ULONG = Cardinal;
+
+const
+  WT_EXECUTEONLYONCE           = ULONG($00000008);
+  WT_EXECUTEINPERSISTENTTHREAD = ULONG($00000080);
+
+function RegisterWaitForSingleObject(out phNewWaitObject: THandle; hObject: THandle;
+  CallBack: TWaitOrTimerCallback; Context: Pointer; dwMilliseconds: ULONG;
+  dwFlags: ULONG): BOOL; stdcall;
+  external 'kernel32.dll' name 'RegisterWaitForSingleObject';
+function RegisterWaitForSingleObjectEx(hObject: THandle;
+  CallBack: TWaitOrTimerCallback; Context: Pointer; dwMilliseconds: ULONG;
+  dwFlags: ULONG): THandle; stdcall;
+  external 'kernel32.dll' name 'RegisterWaitForSingleObjectEx';
+function UnregisterWait(WaitHandle: THandle): BOOL; stdcall;
+  external 'kernel32.dll' name 'UnregisterWait';
+function UnregisterWaitEx(WaitHandle: THandle; CompletionEvent: THandle): BOOL; stdcall;
+  external 'kernel32.dll' name 'UnregisterWaitEx';
+{$ENDIF OTL_NeedsWindowsAPIs}  
 
 function CreateOmniCriticalSection: IOmniCriticalSection;
 function CreateOmniCancellationToken: IOmniCancellationToken;
@@ -325,6 +451,10 @@ procedure Move64(newData: pointer; newReference: cardinal; var Destination); ove
 procedure Move128(var Source, Destination);
 procedure MoveDPtr(var Source, Destination); overload;
 procedure MoveDPtr(newData: pointer; newReference: NativeInt; var Destination); overload;
+
+///<summary>Waits on any number of handles.</summary>
+///<returns>True on success, False on timeout.</returns>
+function WaitForAllObjects(const handles: array of THandle; timeout_ms: cardinal): boolean;
 
 function GetThreadId: NativeInt;
 function GetCPUTimeStamp: int64;
@@ -613,6 +743,17 @@ asm
   mfence
 end; { MFence }
 
+function WaitForAllObjects(const handles: array of THandle; timeout_ms: cardinal):
+  boolean;
+var
+  waiter: TWaitFor;
+begin
+  waiter := TWaitFor.Create(handles);
+  try
+    Result := (waiter.WaitAll(timeout_ms) = waAwaited);
+  finally FreeAndNil(waiter); end;
+end; { WaitForAllObjects }
+
 { TOmniCS }
 
 procedure TOmniCS.Acquire;
@@ -623,7 +764,9 @@ end; { TOmniCS.Acquire }
 
 function TOmniCS.GetLockCount: integer;
 begin
-  Result := ocsSync.LockCount;
+  Result := 0;
+  if Assigned(ocsSync) then
+    Result := ocsSync.LockCount;
 end; { TOmniCS.GetLockCount }
 
 function TOmniCS.GetSyncObj: TSynchroObject;
@@ -753,6 +896,28 @@ procedure TOmniMREW.ExitWriteLock;
 begin
   NativeInt(omrewReference) := 0;
 end; { TOmniMREW.ExitWriteLock }
+
+function TOmniMREW.TryEnterReadLock: boolean;
+var
+  currentReference: NativeInt;
+begin
+  //Wait on writer to reset write flag so Reference.Bit0 must be 0 than increase Reference
+  currentReference := NativeInt(omrewReference) AND NOT 1;
+  Result := CAS(currentReference, currentReference + 2, NativeInt(omrewReference));
+end; { TOmniMREW.TryEnterReadLock }
+
+function TOmniMREW.TryEnterWriteLock: boolean;
+var
+  currentReference: NativeInt;
+begin
+  //Wait on writer to reset write flag so omrewReference.Bit0 must be 0 then set omrewReference.Bit0
+  currentReference := NativeInt(omrewReference) AND NOT 1;
+  Result := CAS(currentReference, currentReference + 1, NativeInt(omrewReference));
+  if Result then
+    //Now wait on all readers
+    repeat
+    until NativeInt(omrewReference) = 1;
+end; { TOmniMREW.TryEnterWriteLock }
 
 { TOmniResourceCount }
 
@@ -1166,7 +1331,7 @@ begin
     );
 end; { TOmniLockManager<K>.LockUnlock }
 
-function TOmniLockManager<K>.Unlock(const key: K): boolean;
+procedure TOmniLockManager<K>.Unlock(const key: K);
 var
   lockData  : TLockValue;
   notifyItem: TGpDoublyLinkedListObject;
@@ -1193,6 +1358,249 @@ begin
 end; { TOmniLockManager<K>.Unlock }
 
 {$ENDIF OTL_Generics}
+
+{ TWaitFor.TWaiter }
+
+constructor TWaitFor.TWaiter.Create(owner: TWaitFor; idxHandle: integer);
+begin
+  inherited Create;
+  FOwner := owner;
+  FIdxHandle := idxHandle;
+end; { TWaitFor.TWaiter.Create }
+
+procedure TWaitFor.TWaiter.Awaited;
+begin
+  FOwner.Awaited_Asy(FIdxHandle);
+end; { TWaitFor.TWaiter.Awaited }
+
+{ TWaitFor }
+
+constructor TWaitFor.Create(const handles: array of THandle);
+begin
+  Create;
+  SetHandles(handles);
+end; { TWaitFor.Create }
+
+constructor TWaitFor.Create;
+begin
+  inherited;
+  FSignal := CreateEvent(nil, false, false, nil);
+  FWaitMode := wmSmart;
+  FWaitHandles := TGpInt64ObjectList.Create;
+end; { TWaitFor.Create }
+
+destructor TWaitFor.Destroy;
+begin
+  FreeAndNil(FWaitHandles);
+  DSiCloseHandleAndNull(FSignal);
+  inherited;
+end; { TWaitFor.Destroy }
+
+procedure TWaitFor.Awaited_Asy(idxHandle: integer);
+var
+  waiter: TWaiter;
+begin
+  FAwaitedLock.Acquire;
+  try
+    waiter := TWaiter(FWaitHandles.Objects[idxHandle]);
+    waiter.Signalled := true;
+    if assigned(FResourceCount) then
+      FResourceCount.Allocate
+    else
+      SetEvent(FSignal);
+  finally FAwaitedLock.Release; end;
+end; { TWaitFor.Awaited_Asy }
+
+function TWaitFor.MsgWaitAny(timeout_ms, wakeMask, flags: cardinal): TWaitResult;
+var
+  winResult: cardinal;
+begin
+  if (FWaitMode = wmForceWFM) or ((FWaitMode = wmSmart) and (Length(FHandles) < 64)) then
+    winResult := MapToHandle(MsgWaitForMultipleObjectsEx(Length(FHandles), FHandles[0], timeout_ms, wakeMask, flags))
+  else begin
+    FIdxSignalled := -1;
+    RegisterWaitHandles(0);
+    try
+      winResult := MsgWaitForMultipleObjectsEx(1, FSignal, timeout_ms, wakeMask, flags);
+    finally UnregisterWaitHandles; end;
+  end;
+  Result := MapToResult(winResult);
+end; { TWaitFor.MsgWaitAny }
+
+procedure WaitForCallback(Context: Pointer; TimerOrWaitFired: Boolean); stdcall;
+begin
+  if not TimerOrWaitFired then
+    TWaitFor.TWaiter(Context).Awaited;
+end; { WaitForCallback }
+
+function TWaitFor.GetWaitHandles: THandleArr;
+begin
+  SetLength(Result, Length(FHandles));
+  if Length(Result) > 0 then
+    Move(FHandles[Low(FHandles)], Result[Low(Result)], Length(Result) * SizeOf(Result[Low(Result)]));
+end; { TWaitFor.GetWaitHandles }
+
+function TWaitFor.MapToHandle(winResult: cardinal): cardinal;
+begin
+  Result := winResult;
+  if {(winResult >= WAIT_OBJECT_0) and }
+     (winResult < (WAIT_OBJECT_0 + cardinal(Length(FHandles)))) then
+  begin
+    SetLength(FSignalledHandles, 1);
+    FSignalledHandles[0].Index := winResult - WAIT_OBJECT_0;
+    Result := WAIT_OBJECT_0;
+  end
+  else
+    SetLength(FSignalledHandles, 0);
+end; { TWaitFor.MapToHandle }
+
+function TWaitFor.MapToResult(winResult: cardinal): TWaitResult;
+begin
+  if winResult = WAIT_OBJECT_0 then
+    Result := waAwaited
+  else if winResult = WAIT_TIMEOUT then
+    Result := waTimeout
+  else if winResult = WAIT_IO_COMPLETION then
+    Result := waIOCompletion
+  else
+    Result := waFailed;
+end; { TWaitFor.MapToResult }
+
+procedure TWaitFor.RegisterWaitHandles(extraFlags: cardinal);
+var
+  idxWait      : integer;
+  iHandle      : integer;
+  newWaitObject: THandle;
+  waiter       : TWaiter;
+begin
+  FWaitHandles.Clear;
+  for iHandle := Low(FHandles) to High(FHandles) do begin
+    waiter := TWaiter.Create(Self, iHandle);
+    idxWait := FWaitHandles.AddObject(0 {placeholder}, waiter);
+    if iHandle <> idxWait then
+      raise Exception.Create('TWaitFor.RegisterWaitHandles: Indexes out of sync');
+    Win32Check(RegisterWaitForSingleObject(newWaitObject, FHandles[iHandle], WaitForCallback,
+                                           pointer(waiter), INFINITE,
+                                           extraFlags OR WT_EXECUTEINPERSISTENTTHREAD));
+    FWaitHandles[idxWait] := newWaitObject;
+  end;
+  SetLength(FSignalledHandles, 0);
+end; { TWaitFor.RegisterWaitHandles }
+
+procedure TWaitFor.SetHandles(const handles: array of THandle);
+var
+  iHandle: integer;
+begin
+  SetLength(FHandles, Length(handles));
+  for iHandle := Low(handles) to High(handles) do
+    FHandles[iHandle] := handles[iHandle];
+end; { TWaitFor.SetHandles }
+
+procedure TWaitFor.UnregisterWaitHandles;
+var
+  countSignalled: integer;
+  i             : integer;
+  waiter        : TWaiter;
+begin
+  for i := 0 to FWaitHandles.Count - 1 do
+    UnregisterWait(THandle(FWaitHandles[i]));
+
+  SetLength(FSignalledHandles, FWaitHandles.Count);
+  countSignalled := 0;
+  for i := 0 to FWaitHandles.Count - 1 do begin
+    waiter := TWaiter(FWaitHandles.Objects[i]);
+    if waiter.Signalled then begin
+      FSignalledHandles[countSignalled].Index := waiter.Index;
+      Inc(countSignalled);
+    end;
+  end;
+  SetLength(FSignalledHandles, countSignalled);
+  FWaitHandles.Clear;
+end; { TWaitFor.UnregisterWaitHandles }
+
+function TWaitFor.WaitAll(timeout_ms: cardinal): TWaitResult;
+var
+  winResult: cardinal;
+begin
+  if (FWaitMode = wmForceWFM) or ((FWaitMode = wmSmart) and (Length(FHandles) <= 64)) then
+    winResult := MapToHandle(WaitForMultipleObjects(Length(FHandles), @(FHandles[0]), true, timeout_ms))
+  else begin
+    FResourceCount := CreateResourceCount(Length(FHandles));
+    try
+      RegisterWaitHandles(WT_EXECUTEONLYONCE);
+      try
+        winResult := WaitForSingleObject(FResourceCount.Handle, timeout_ms);
+      finally UnregisterWaitHandles; end;
+    finally FResourceCount := nil; end;
+  end;
+  Result := MapToResult(winResult);
+end; { TWaitFor.WaitAll }
+
+function TWaitFor.WaitAny(timeout_ms: cardinal; alertable: boolean): TWaitResult;
+var
+  winResult: cardinal;
+begin
+  if (FWaitMode = wmForceWFM) or ((FWaitMode = wmSmart) and (Length(FHandles) <= 64)) then
+    winResult := MapToHandle(WaitForMultipleObjectsEx(Length(FHandles), @(FHandles[0]), false, timeout_ms, alertable))
+  else begin
+    FIdxSignalled := -1;
+    RegisterWaitHandles(0);
+    try
+      winResult := WaitForMultipleObjectsEx(1, @FSignal, false, timeout_ms, alertable);
+    finally UnregisterWaitHandles; end;
+  end;
+  Result := MapToResult(winResult);
+end; { TWaitFor.WaitAny }
+
+procedure TOmniSingleThreadUseChecker.AttachToCurrentThread;
+begin
+  FLock.Acquire;
+  try
+    FThreadID := cardinal(GetCurrentThreadID);
+  finally FLock.Release; end;
+end; { TOmniSingleThreadUseChecker.AttachToCurrentThread }
+
+procedure TOmniSingleThreadUseChecker.Check;
+{$IFDEF MSWINDOWS}
+var
+  thID: cardinal;
+{$ENDIF MSWINDOWS}
+begin
+  {$IFDEF MSWINDOWS}
+  FLock.Acquire;
+  try
+    thID := cardinal(GetCurrentThreadID);
+    if (FThreadID <> 0) and (FThreadID <> thID) then
+      raise Exception.CreateFmt(
+        'Unsafe use: Current thread ID: %d, previous thread ID: %d',
+        [thID, FThreadID]);
+    FThreadID := thId;
+  finally FLock.Release; end;
+  {$ENDIF MSWINDOWS}
+end; { TOmniSingleThreadUseChecker.Check }
+
+procedure TOmniSingleThreadUseChecker.DebugCheck;
+{$IFDEF MSWINDOWS}
+{$IFDEF OTL_CheckThreadSafety}
+var
+  thID: cardinal;
+{$ENDIF OTL_CheckThreadSafety}
+{$ENDIF MSWINDOWS}
+begin
+  {$IFDEF MSWINDOWS}
+  {$IFDEF OTL_CheckThreadSafety}
+  FLock.Acquire;
+  try
+    thID := cardinal(GetCurrentThreadID);
+    if (FThreadID <> 0) and (FThreadID <> thID) then
+      raise Exception.CreateFmt(
+        'Unsafe use: Current thread ID: %d, previous thread ID: %d',
+        [thID, FThreadID]);
+    FThreadID := thId;
+  finally FLock.Release; end;
+  {$ENDIF OTL_CheckThreadSafety}
+  {$ENDIF MSWINDOWS}
+end; { TOmniSingleThreadUseChecker.DebugCheck }
 
 initialization
   GOmniCancellationToken := CreateOmniCancellationToken;

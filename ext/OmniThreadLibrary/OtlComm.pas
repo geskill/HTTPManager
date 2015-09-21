@@ -3,7 +3,7 @@
 ///<license>
 ///This software is distributed under the BSD license.
 ///
-///Copyright (c) 2011, Primoz Gabrijelcic
+///Copyright (c) 2015, Primoz Gabrijelcic
 ///All rights reserved.
 ///
 ///Redistribution and use in source and binary forms, with or without modification,
@@ -31,10 +31,20 @@
 ///   Author            : Primoz Gabrijelcic
 ///   Contributors      : GJ, Lee_Nover
 ///   Creation date     : 2008-06-12
-///   Last modification : 2011-11-09
-///   Version           : 1.08a
+///   Last modification : 2015-07-28
+///   Version           : 1.11
 ///</para><para>
 ///   History:
+///     1.11: 2015-07-28
+///       - Removed IOmniCommunicationEndpointEx.
+///       - Removed single-thread use checks.
+///       - SendWait and ReceiveWait are now thread-safe.
+///     1.10: 2015-07-27
+///       - TOmniCommunicationEndpoint implements IOmniCommunicationEndpointEx,
+///	        primarily designed for internal use.
+///     1.09: 2015-07-10
+///       - TOmniCommunicationEndpoint will check for single-thread use if
+///         OTL_CheckThreadSafety is defined.
 ///     1.08a: 2011-11-09
 ///       - TOmniMessageQueue.Enqueue leaked if queue was full and value contained
 ///         reference counted value (found by [meishier]).
@@ -103,6 +113,8 @@ type
 
   TOmniMessageQueue = class;
 
+  {:Single producer/single consumer communication channel. No thread safety.
+  }
   IOmniCommunicationEndpoint = interface ['{910D329C-D049-48B9-B0C0-9434D2E57870}']
     function  GetNewMessageEvent: THandle;
     function  GetOtherEndpoint: IOmniCommunicationEndpoint;
@@ -207,16 +219,15 @@ type
 
   TOmniTwoWayChannel = class;
 
-  TOmniCommunicationEndpoint = class(TInterfacedObject, IOmniCommunicationEndpoint,
-    IOmniCommunicationEndpointInternal)
+  TOmniCommunicationEndpoint = class(TInterfacedObject,
+                                     IOmniCommunicationEndpoint,
+                                     IOmniCommunicationEndpointInternal)
   strict private
     ceOwner_ref              : TOmniTwoWayChannel;
-    cePartlyEmptyObserver    : TOmniContainerWindowsEventObserver;
     ceReader_ref             : TOmniMessageQueue;
     ceTaskTerminatedEvent_ref: THandle;
     ceWriter_ref             : TOmniMessageQueue;
   strict protected
-    procedure RequirePartlyEmptyObserver;
   protected
     procedure DetachFromQueues;
     function  GetNewMessageEvent: THandle;
@@ -226,7 +237,6 @@ type
   public
     constructor Create(owner: TOmniTwoWayChannel; readQueue, writeQueue: TOmniMessageQueue;
       taskTerminatedEvent_ref: THandle);
-    destructor  Destroy; override;
     function  Receive(var msg: TOmniMessage): boolean; overload; inline;
     function  Receive(var msgID: word; var msgData: TOmniValue): boolean; overload; inline;
     function  ReceiveWait(var msg: TOmniMessage; timeout_ms: cardinal): boolean; overload; inline;
@@ -415,15 +425,6 @@ begin
   ceTaskTerminatedEvent_ref := taskTerminatedEvent_ref;
 end; { TOmniCommunicationEndpoint.Create }
 
-destructor TOmniCommunicationEndpoint.Destroy;
-begin
-  if assigned(ceWriter_ref) and assigned(ceWriter_ref.ContainerSubject) and
-     assigned(cePartlyEmptyObserver) 
-  then
-    ceWriter_ref.ContainerSubject.Detach(cePartlyEmptyObserver, coiNotifyOnPartlyEmpty);
-  FreeAndNil(cePartlyEmptyObserver);
-end; { TOmniCommunicationEndpoint.Destroy }
-
 procedure TOmniCommunicationEndpoint.DetachFromQueues;
 begin
   ceReader_ref := nil;
@@ -464,23 +465,41 @@ begin
   Result := ceReader_ref.TryDequeue(msg);
 end; { TOmniCommunicationEndpoint.Receive }
 
-function TOmniCommunicationEndpoint.ReceiveWait(var msg: TOmniMessage; timeout_ms:
-  cardinal): boolean;
+function TOmniCommunicationEndpoint.ReceiveWait(var msg: TOmniMessage; timeout_ms: cardinal): boolean;
+var
+  insertObserver: TOmniContainerWindowsEventObserver;
+  retry         : boolean;
+  startTime     : int64;
+  waitTime      : int64;
 begin
   Result := Receive(msg);
   if (not Result) and (timeout_ms > 0) then begin
     if ceTaskTerminatedEvent_ref = 0 then
       raise Exception.Create('TOmniCommunicationEndpoint.ReceiveWait: <task terminated> event is not set');
-    ResetEvent(ceReader_ref.GetNewMessageEvent);
-    Result := Receive(msg);
-    if not Result then begin
-      if DSiWaitForTwoObjects(ceReader_ref.GetNewMessageEvent,
-           ceTaskTerminatedEvent_ref, false, timeout_ms) = WAIT_OBJECT_0 then
-      begin
-        msg := ceReader_ref.Dequeue;
-        Result := true;
-      end
-    end; //if not Result
+    startTime := DSiTimeGetTime64;
+    insertObserver := CreateContainerWindowsEventObserver;
+    try
+      ceReader_ref.ContainerSubject.Attach(insertObserver, coiNotifyOnAllInserts);
+      try
+        repeat
+          retry := false;
+          Result := ceReader_ref.TryDequeue(msg);
+          while not Result do begin
+            waitTime := Int64(timeout_ms) - DSiElapsedTime64(startTime);
+            if (waitTime >= 0) and
+               (DSiWaitForTwoObjects(insertObserver.GetEvent, ceTaskTerminatedEvent_ref,
+                 false, Cardinal(waitTime)) = WAIT_OBJECT_0)
+            then begin
+              Result := ceReader_ref.TryDequeue(msg);
+              if (not Result) and (waitTime > 0) then
+                retry := true;
+            end
+            else
+              break; //while
+          end; //while
+        until not retry;
+      finally ceReader_ref.ContainerSubject.Detach(insertObserver, coiNotifyOnAllInserts); end;
+    finally FreeAndNil(insertObserver); end;
   end;
 end; { TOmniCommunicationEndpoint.ReceiveWait }
 
@@ -496,18 +515,6 @@ begin
   end;
 end; { TOmniCommunicationEndpoint.ReceiveWait }
 
-procedure TOmniCommunicationEndpoint.RequirePartlyEmptyObserver;
-begin
-  if not assigned(cePartlyEmptyObserver) then begin
-    cePartlyEmptyObserver := CreateContainerWindowsEventObserver;
-    OtherEndpoint.Reader.ContainerSubject.Attach(cePartlyEmptyObserver, coiNotifyOnPartlyEmpty);
-  end
-  else begin
-    cePartlyEmptyObserver.Deactivate;
-    ResetEvent(cePartlyEmptyObserver.GetEvent);
-  end;
-end; { TOmniCommunicationEndpoint.RequirePartlyEmptyObserver }
-
 procedure TOmniCommunicationEndpoint.Send(const msg: TOmniMessage);
 begin
   if not ceWriter_ref.Enqueue(msg) then
@@ -516,12 +523,12 @@ end;  { TOmniCommunicationEndpoint.Send }
 
 function TOmniCommunicationEndpoint.SendWait(msgID: word; msgData: TOmniValue;
   timeout_ms: cardinal): boolean;
-label
-  retry;
 var
-  msg      : TOmniMessage;
-  startTime: int64;
-  waitTime : integer;
+  msg                : TOmniMessage;
+  partlyEmptyObserver: TOmniContainerWindowsEventObserver;
+  retry              : boolean;
+  startTime          : int64;
+  waitTime           : integer;
 begin
   msg.msgID := msgID;
   msg.msgData := msgData;
@@ -529,25 +536,31 @@ begin
   if (not Result) and (timeout_ms > 0) then begin
     if ceTaskTerminatedEvent_ref = 0 then
       raise Exception.Create('TOmniCommunicationEndpoint.SendWait: <task terminated> event is not set');
-    startTime := GetTickCount;
-  retry:
-    RequirePartlyEmptyObserver;
-    Result := ceWriter_ref.Enqueue(msg);
-    if not Result then begin
-      while not Result do begin
-        waitTime := timeout_ms - DSiElapsedSince(GetTickCount, startTime);
-        if (waitTime >= 0) and
-           (DSiWaitForTwoObjects(cePartlyEmptyObserver.GetEvent, ceTaskTerminatedEvent_ref,
-             false, waitTime) = WAIT_OBJECT_0)
-        then begin
+    startTime := DSiTimeGetTime64;
+
+    partlyEmptyObserver := CreateContainerWindowsEventObserver;
+    try
+      OtherEndpoint.Reader.ContainerSubject.Attach(partlyEmptyObserver, coiNotifyOnPartlyEmpty);
+      try
+        repeat
+          retry := false;
           Result := ceWriter_ref.Enqueue(msg);
-          if not Result then
-            goto retry;
-        end
-        else
-          break; //while
-      end; //while
-    end; //if not Result
+          while not Result do begin
+            waitTime := timeout_ms - DSiElapsedTime64(startTime);
+            if (waitTime >= 0) and
+               (DSiWaitForTwoObjects(partlyEmptyObserver.GetEvent, ceTaskTerminatedEvent_ref,
+                 false, waitTime) = WAIT_OBJECT_0)
+            then begin
+              Result := ceWriter_ref.Enqueue(msg);
+              if (not Result) and (waitTime > 0) then
+                retry := true;
+            end
+            else
+              break; //while
+          end; //while
+        until not retry;
+      finally ceWriter_ref.ContainerSubject.Detach(partlyEmptyObserver, coiNotifyOnPartlyEmpty); end;
+    finally FreeAndNil(partlyEmptyObserver); end;
   end;
   if not Result then
     msg.msgData._ReleaseAndClear;

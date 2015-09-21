@@ -46,6 +46,8 @@
 ///       - Released.
 ///</para></remarks>
 
+// See the Configuration block below to configure your build process.
+
 {$ALIGN 8}
 {$BOOLEVAL OFF}
 {$EXTENDEDSYNTAX ON}
@@ -57,9 +59,10 @@
 {$ASSERTIONS ON}
 {$TYPEINFO OFF}
 
-{$IF CompilerVersion >= 26} //DXE5
-  {$LEGACYIFEND ON}
-  {$DEFINE OTL_StrPasInAnsiStrings}
+{$IF CompilerVersion >= 26}{$LEGACYIFEND ON}{$IFEND}
+
+{$IF CompilerVersion < 19} //D2007
+  {$DEFINE OTL_NeedsWindowsAPIs}
 {$IFEND}
 
 {$IF CompilerVersion >= 20} //D2009
@@ -92,3 +95,8 @@
 {$IF CompilerVersion >= 24} //DXE3
   {$DEFINE OTL_LongGetMethodInfo}
 {$IFEND}
+
+{$IF CompilerVersion >= 26} //DXE5
+  {$DEFINE OTL_StrPasInAnsiStrings}
+{$IFEND}
+

@@ -1,15 +1,50 @@
 (*:Various stuff with no other place to go.
    @author Primoz Gabrijelcic
    @desc <pre>
-   (c) 2013 Primoz Gabrijelcic
+   (c) 2015 Primoz Gabrijelcic
    Free for personal and commercial use. No rights reserved.
 
    Author            : Primoz Gabrijelcic
    Creation date     : 2006-09-25
-   Last modification : 2014-01-06
-   Version           : 1.38
+   Last modification : 2015-07-24
+   Version           : 1.53
 </pre>*)(*
    History:
+     1.54: 2015-07-24
+       - Added function ParamArray which returns all command-line parameters
+         (except ParamStr(0)) as TArray<string>.
+     1.52: 2015-07-15
+       - Implemented function IsInList(string, array of string).
+       - Join renamed to JoinList.
+     1.51: 2015-06-15
+       - Defined anonymous records TRec<T1...T4>.
+     1.50: 2015-05-20
+       - Added optional filter proc parameter to EnumList.
+     1.49: 2015-05-11
+       - Implemented Join(TArray<string>).
+     1.48: 2015-04-10
+       - Implemented AddToList function.
+     1.47: 2015-04-03
+       - Implemented SplitList function.
+     1.46: 2015-02-16
+       - Implemented RoundDownTo function.
+       - RoundUpTo marked as inline.
+     1.45a: 2015-02-06
+       - Compiles with D2007.
+     1.45: 2015-01-22
+       - Added Ternary<T> record for generic IFF operations.
+     1.44: 2014-05-19
+       - Implemented IGpBuffer.AsStream.
+     1.43: 2014-05-16
+       - Implemented IGpBuffer.AsString.
+     1.42: 2014-04-21
+       - Added parameter ignoreDottedFolders to EnumFiles.
+     1.41: 2014-03-19
+       - Added default property ByteVal[] to IGpBuffer.
+     1.40: 2014-01-15
+       - TGpBuffer can be initialized from a stream.
+     1.39: 2014-01-10
+       - Implemented IGpAutoDestroyObject.Detach.
      1.38: 2014-01-06
        - Implemented TGpInterfacedPersistent.
        - IGpBuffer reimplemented using TMemoryStream.
@@ -50,11 +85,7 @@
      1.24: 2010-12-14
        - Implemented function DebugBreak.
      1.23: 2010-09-21
-       - Implemented function DisableHandler. Usage:
-           with DisableHandler(@@cbDisableInterface.OnClick) do begin
-             cbDisableInterface.Checked := newValue;
-             Restore;
-           end;
+       - Implemented function DisableHandler. 
      1.22: 2010-07-09
        - Added IFF overload with AnsiString parameters (Unicode Delphi only).
      1.21: 2010-04-13
@@ -149,12 +180,17 @@ uses
   {$IFEND}
   {$IF CompilerVersion >= 20} //D2009+
     {$DEFINE GpStuff_Anonymous}
+    {$DEFINE GpStuff_Generics}
   {$IFEND}
   {$IF CompilerVersion >= 21} //D2010+
     {$DEFINE GpStuff_NativeInt}
   {$IFEND}
   {$IF CompilerVersion >= 22} //XE
     {$DEFINE GpStuff_RegEx}
+    {$DEFINE GpStuff_TArrayOfT}
+  {$IFEND}
+  {$IF CompilerVersion >= 23} //XE2
+    {$DEFINE GpStuff_FullAnonymous}
   {$IFEND}
 {$ENDIF}
 
@@ -253,7 +289,6 @@ type
     gtTraceRef: boolean;
   protected
     function  GetLogReferences: boolean; stdcall;
-    function  GetRefCount: integer; stdcall;
     function  GetTraceReferences: boolean; stdcall;
     procedure SetLogReferences(const value: boolean); stdcall;
     procedure SetTraceReferences(const value: boolean); stdcall;
@@ -261,6 +296,7 @@ type
     destructor  Destroy; override;
     function  _AddRef: integer; stdcall;
     function  _Release: integer; stdcall;
+    function  GetRefCount: integer; stdcall;
     property LogReferences: boolean read GetLogReferences write SetLogReferences;
     property TraceReferences: boolean read GetTraceReferences write SetTraceReferences;
   end; { TGpTraceable }
@@ -268,6 +304,7 @@ type
   IGpAutoDestroyObject = interface ['{17A1E78B-69EF-42EE-A64B-DA4EA81A2C2C}']
     function  GetObj: TObject;
   //
+    function  Detach: TObject;
     procedure Free;
     property Obj: TObject read GetObj;
   end; { IGpAutoDestroyObject }
@@ -293,8 +330,13 @@ type
 
   IGpBuffer = interface
     function  GetAsAnsiString: AnsiString;
+    function  GetAsStream: TStream;
+    function  GetAsString: string;
+    function  GetByteVal(idx: integer): byte;
     function  GetSize: integer;
     procedure SetAsAnsiString(const value: AnsiString);
+    procedure SetAsString(const value: string);
+    procedure SetByteVal(idx: integer; const value: byte);
     function  GetValue: pointer;
   //
     procedure Add(b: byte); overload;
@@ -304,6 +346,9 @@ type
     procedure Clear;
     function  IsEmpty: boolean;
     property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
+    property AsStream: TStream read GetAsStream;
+    property AsString: string read GetAsString write SetAsString;
+    property ByteVal[idx: integer]: byte read GetByteVal write SetByteVal; default;
     property Size: integer read GetSize;
     property Value: pointer read GetValue;
   end; { IGpBuffer }
@@ -311,14 +356,20 @@ type
   TGpBuffer = class(TInterfacedObject, IGpBuffer)
   strict private
     FData: TMemoryStream;
-  strict protected
+  protected
     function  GetAsAnsiString: AnsiString; inline;
+    function  GetAsStream: TStream; inline;
+    function  GetAsString: string; inline;
+    function  GetByteVal(idx: integer): byte; inline;
     function  GetSize: integer; inline;
     function  GetValue: pointer; inline;
-    procedure SetAsAnsiString(const value: AnsiString);
+    procedure SetAsAnsiString(const value: AnsiString); inline;
+    procedure SetAsString(const value: string); inline;
+    procedure SetByteVal(idx: integer; const value: byte); inline;
   public
     constructor Create; overload;
     constructor Create(data: pointer; size: integer); overload;
+    constructor Create(stream: TStream); overload;
     destructor  Destroy; override;
     procedure Add(b: byte); overload; inline;
     procedure Add(ch: AnsiChar); overload; inline;
@@ -327,6 +378,9 @@ type
     procedure Clear; inline;
     function  IsEmpty: boolean; inline;
     property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
+    property AsStream: TStream read GetAsStream;
+    property AsString: string read GetAsString write SetAsString;
+    property ByteVal[idx: integer]: byte read GetByteVal write SetByteVal; default;
     property Size: integer read GetSize;
     property Value: pointer read GetValue;
   end; { TGpBuffer }
@@ -354,6 +408,34 @@ function  IFF64(condit: boolean; iftrue, iffalse: int64): int64;              {$
 function  IFF(condit: boolean; iftrue, iffalse: AnsiString): AnsiString; overload;    {$IFDEF GpStuff_Inline}inline;{$ENDIF}
 {$ENDIF Unicode}
 
+{$IFDEF GpStuff_Generics}
+type
+  Ternary<T> = record
+    class function IFF(condit: boolean; iftrue, iffalse: T): T; static;       {$IFDEF GpStuff_Inline}inline;{$ENDIF}
+  end;
+
+  TRec<T1,T2> = record
+    Field1: T1;
+    Field2: T2;
+    constructor Create(Value1: T1; Value2: T2);
+  end;
+
+  TRec<T1,T2,T3> = record
+    Field1: T1;
+    Field2: T2;
+    Field3: T3;
+    constructor Create(Value1: T1; Value2: T2; Value3: T3);
+  end;
+
+  TRec<T1,T2,T3,T4> = record
+    Field1: T1;
+    Field2: T2;
+    Field3: T3;
+    Field4: T4;
+    constructor Create(Value1: T1; Value2: T2; Value3: T3; Value4: T4);
+  end;
+{$ENDIF GpStuff_Generics}
+
 function  OffsetPtr(ptr: pointer; offset: integer): pointer;                  {$IFDEF GpStuff_Inline}inline;{$ENDIF}
 
 ///<summary>Reverses byte order in a 4-byte number.</summary>
@@ -361,7 +443,6 @@ function  ReverseDWord(dw: DWORD): DWORD;
 ///<summary>Reverses byte order in a 2-byte number.</summary>
 function  ReverseWord(w: word): word;
 
-{$IFNDEF CPUX64}
 ///<summary>Locates specified value in a buffer.</summary>
 ///<returns>Offset of found value (0..dataLen-1) or -1 if value was not found.</returns>
 ///<since>2007-02-22</since>
@@ -371,7 +452,6 @@ function  TableFindEQ(value: byte; data: PChar; dataLen: integer): integer; asse
 ///<returns>Offset of first differing value (0..dataLen-1) or -1 if buffer contains only specified values.</returns>
 ///<since>2007-02-22</since>
 function  TableFindNE(value: byte; data: PChar; dataLen: integer): integer; assembler;
-{$ENDIF ~CPUX64}
 
 ///<summary>Converts open variant array to COM variant array.<para>
 ///  Written by Thomas Schubbauer and published in borland.public.delphi.objectpascal on
@@ -396,11 +476,14 @@ procedure DontOptimize(var data);
 function FletcherChecksum(const buffer; size: integer): word;
 
 {$IFDEF GpStuff_NativeInt}
-function RoundUpTo(value: NativeInt; granularity: integer): NativeInt; overload;
+function RoundDownTo(value: NativeInt; granularity: integer): NativeInt; overload; {$IFDEF GpStuff_Inline}inline;{$ENDIF}
+function RoundUpTo(value: NativeInt; granularity: integer): NativeInt; overload;   {$IFDEF GpStuff_Inline}inline;{$ENDIF}
 {$ELSE}
-function RoundUpTo(value: integer; granularity: integer): integer; overload;
+function RoundDownTo(value: integer; granularity: integer): integer; overload;     {$IFDEF GpStuff_Inline}inline;{$ENDIF}
+function RoundUpTo(value: integer; granularity: integer): integer; overload;       {$IFDEF GpStuff_Inline}inline;{$ENDIF}
 {$ENDIF GpStuff_NativeInt}
-function RoundUpTo(value: pointer; granularity: integer): pointer; overload;
+function RoundDownTo(value: pointer; granularity: integer): pointer; overload;     {$IFDEF GpStuff_Inline}inline;{$ENDIF}
+function RoundUpTo(value: pointer; granularity: integer): pointer; overload;       {$IFDEF GpStuff_Inline}inline;{$ENDIF}
 
 {$IFDEF GpStuff_ValuesEnumerators}
 type
@@ -451,12 +534,34 @@ function EnumValues(const aValues: array of integer): IGpIntegerValueEnumeratorF
 function EnumStrings(const aValues: array of string): IGpStringValueEnumeratorFactory;
 function EnumPairs(const aValues: array of string): IGpStringPairEnumeratorFactory;
 function EnumList(const aList: string; delim: char; const quoteChar: string = '';
-  stripQuotes: boolean = true): IGpStringValueEnumeratorFactory; overload;
+  stripQuotes: boolean = true{$IFDEF GpStuff_FullAnonymous};
+  filter: TFunc<string,string> = nil{$ENDIF GpStuff_FullAnonymous}): IGpStringValueEnumeratorFactory; overload;
 function EnumList(const aList: string; delim: TSysCharSet; const quoteChar: string = '';
-  stripQuotes: boolean = true): IGpStringValueEnumeratorFactory; overload;
+  stripQuotes: boolean = true{$IFDEF GpStuff_FullAnonymous};
+  filter: TFunc<string,string> = nil{$ENDIF GpStuff_FullAnonymous}): IGpStringValueEnumeratorFactory; overload;
 function EnumFiles(const fileMask: string; attr: integer; returnFullPath: boolean = false;
-  enumSubfolders: boolean = false; maxEnumDepth: integer = 0): IGpStringValueEnumeratorFactory;
+  enumSubfolders: boolean = false; maxEnumDepth: integer = 0;
+  ignoreDottedFolders: boolean = false): IGpStringValueEnumeratorFactory;
 
+function AddToList(const aList, delim, newElement: string): string;
+function IsInList(const value: string; const values: array of string; caseSensitive: boolean = false): boolean;
+
+{$IFDEF GpStuff_TArrayOfT}
+function SplitList(const aList: string; delim: char; const quoteChar: string = '';
+  stripQuotes: boolean = true): TArray<string>; overload;
+function SplitList(const aList: string; delim: TSysCharSet; const quoteChar: string = '';
+  stripQuotes: boolean = true): TArray<string>; overload;
+function JoinList(const strings: TArray<string>; const delimiter: string): string;
+
+//returns command-line parameters (from 1 to ParamCount) as TArray<string>
+function ParamArray: TArray<string>;
+{$ENDIF GpStuff_TArrayOfT}
+
+///Usage:
+///  with DisableHandler(@@cbDisableInterface.OnClick) do begin
+///    cbDisableInterface.Checked := newValue;
+///    Restore;
+///  end;
 function DisableHandler(const handler: PMethod): IGpDisableHandler;
 {$ENDIF GpStuff_ValuesEnumerators}
 
@@ -473,6 +578,8 @@ type
   end; { IGpStringBuilder }
 
 function BuildString: IGpStringBuilder;
+
+function GetRefCount(const intf: IInterface): integer;
 
 implementation
 
@@ -588,6 +695,7 @@ type
   public
     constructor Create(obj: TObject);
     destructor  Destroy; override;
+    function Detach: TObject;
     procedure Free;
     property Obj: TObject read GetObj;
   end; { IGpAutoDestroyObject }
@@ -894,18 +1002,24 @@ end; { DebugBreak }
 
 function ReverseDWord(dw: cardinal): cardinal;
 asm
+  {$IFDEF CPUX64}
+  mov rax, rcx
+  {$ENDIF}
   bswap eax
 end; { ReverseDWord }
 
 function ReverseWord(w: word): word;
 asm
+   {$IFDEF CPUX64}
+   mov rax, rcx
+   {$ENDIF}
    xchg   al, ah
 end; { ReverseWord }
 
-{$IFNDEF CPUX64}
 function TableFindEQ(value: byte; data: PChar; dataLen: integer): integer; assembler;
 asm
 {$IFDEF WIN64}
+// value - RCX, data - RDX, dataLen - R8
       PUSH  rDI
       mov   al, value
       MOV   rDI, data
@@ -935,9 +1049,11 @@ function TableFindNE(value: byte; data: PChar; dataLen: integer): integer; assem
 asm
 {$IFDEF WIN64}
       PUSH  rDI
-      MOV   rDI,rDX
+      mov   al, value
+      MOV   rDI, data
+      xor   rcx, rcx
       mov   ecx, dataLen
-      REPE  SCASB
+      REPNE SCASB
       MOV   rAX, -1
       JE    @@1
       MOV   rAX,rDI
@@ -956,7 +1072,7 @@ asm
 @@1:  POP   EDI
 {$ENDIF WIN64}
 end; { TableFindNE }
-{$ENDIF ~CPUX64}
+
 
 {$IFDEF GpStuff_AlignedInt}
 
@@ -1288,11 +1404,13 @@ begin
 end; { EnumPairs }
 
 function EnumList(const aList: string; delim: char; const quoteChar: string;
-  stripQuotes: boolean): IGpStringValueEnumeratorFactory;
+  stripQuotes: boolean{$IFDEF GpStuff_FullAnonymous};
+  filter: TFunc<string,string>{$ENDIF GpStuff_FullAnonymous}): IGpStringValueEnumeratorFactory;
 var
   delimiters: TDelimiters;
   iDelim    : integer;
   quote     : char;
+  s         : string;
   sl        : TStringList;
 begin
   sl := TStringList.Create;
@@ -1309,20 +1427,27 @@ begin
          (aList[delimiters[iDelim  ] + 1] = quote) and
          (aList[delimiters[iDelim+1] - 1] = quote)
       then
-        sl.Add(Copy(aList, delimiters[iDelim] + 2, delimiters[iDelim+1] - delimiters[iDelim] - 3))
+        s := Copy(aList, delimiters[iDelim] + 2, delimiters[iDelim+1] - delimiters[iDelim] - 3)
       else
-        sl.Add(Copy(aList, delimiters[iDelim] + 1, delimiters[iDelim+1] - delimiters[iDelim] - 1));
+        s := Copy(aList, delimiters[iDelim] + 1, delimiters[iDelim+1] - delimiters[iDelim] - 1);
+      {$IFDEF GpStuff_FullAnonymous}
+      if assigned(filter) then
+        s := filter(s);
+      {$ENDIF GpStuff_FullAnonymous}
+      sl.Add(s);
     end;
   end;
   Result := TGpStringValueEnumeratorFactory.Create(sl); //factory takes ownership
 end; { EnumList }
 
 function EnumList(const aList: string; delim: TSysCharSet; const quoteChar: string;
-  stripQuotes: boolean): IGpStringValueEnumeratorFactory;
+  stripQuotes: boolean{$IFDEF GpStuff_FullAnonymous};
+  filter: TFunc<string,string>{$ENDIF GpStuff_FullAnonymous}): IGpStringValueEnumeratorFactory;
 var
   delimiters: TDelimiters;
   iDelim    : integer;
   quote     : char;
+  s         : string;
   sl        : TStringList;
 begin
   sl := TStringList.Create;
@@ -1339,25 +1464,149 @@ begin
          (aList[delimiters[iDelim  ] + 1] = quote) and
          (aList[delimiters[iDelim+1] - 1] = quote)
       then
-        sl.Add(Copy(aList, delimiters[iDelim] + 2, delimiters[iDelim+1] - delimiters[iDelim] - 3))
+        s := Copy(aList, delimiters[iDelim] + 2, delimiters[iDelim+1] - delimiters[iDelim] - 3)
       else
-        sl.Add(Copy(aList, delimiters[iDelim] + 1, delimiters[iDelim+1] - delimiters[iDelim] - 1));
+        s := Copy(aList, delimiters[iDelim] + 1, delimiters[iDelim+1] - delimiters[iDelim] - 1);
+      {$IFDEF GpStuff_FullAnonymous}
+      if assigned(filter) then
+        s := filter(s);
+      {$ENDIF GpStuff_FullAnonymous}
+      sl.Add(s);
     end;
   end;
   Result := TGpStringValueEnumeratorFactory.Create(sl); //factory takes ownership
 end; { EnumList }
 
+{$IFDEF GpStuff_TArrayOfT}
+function SplitList(const aList: string; delim: char; const quoteChar: string = '';
+  stripQuotes: boolean = true): TArray<string>;
+var
+  delimiters: TDelimiters;
+  iDelim    : integer;
+  quote     : char;
+begin
+  if aList <> '' then begin
+    if stripQuotes and (quoteChar <> '') then
+      quote := quoteChar[1]
+    else begin
+      stripQuotes := false;
+      quote := #0; //to keep compiler happy;
+    end;
+    GetDelimiters(aList, delim, quoteChar, true, delimiters);
+    SetLength(Result, High(delimiters) - Low(delimiters));
+    for iDelim := Low(delimiters) to High(delimiters) - 1 do begin
+      if stripQuotes and
+         (aList[delimiters[iDelim  ] + 1] = quote) and
+         (aList[delimiters[iDelim+1] - 1] = quote)
+      then
+        Result[iDelim-Low(delimiters)] := Copy(aList, delimiters[iDelim] + 2, delimiters[iDelim+1] - delimiters[iDelim] - 3)
+      else
+        Result[iDelim-Low(delimiters)] := Copy(aList, delimiters[iDelim] + 1, delimiters[iDelim+1] - delimiters[iDelim] - 1);
+    end;
+  end;
+end; { SplitList }
+
+function SplitList(const aList: string; delim: TSysCharSet; const quoteChar: string = '';
+  stripQuotes: boolean = true): TArray<string>;
+var
+  delimiters: TDelimiters;
+  iDelim    : integer;
+  quote     : char;
+begin
+  if aList <> '' then begin
+    if stripQuotes and (quoteChar <> '') then
+      quote := quoteChar[1]
+    else begin
+      stripQuotes := false;
+      quote := #0; //to keep compiler happy;
+    end;
+    GetDelimiters(aList, delim, quoteChar, true, delimiters);
+    SetLength(Result, High(delimiters) - Low(delimiters));
+    for iDelim := Low(delimiters) to High(delimiters) - 1 do begin
+      if stripQuotes and
+         (aList[delimiters[iDelim  ] + 1] = quote) and
+         (aList[delimiters[iDelim+1] - 1] = quote)
+      then
+        Result[iDelim-Low(delimiters)] := Copy(aList, delimiters[iDelim] + 2, delimiters[iDelim+1] - delimiters[iDelim] - 3)
+      else
+        Result[iDelim-Low(delimiters)] := Copy(aList, delimiters[iDelim] + 1, delimiters[iDelim+1] - delimiters[iDelim] - 1);
+    end;
+  end;
+end; { SplitList }
+
+function JoinList(const strings: TArray<string>; const delimiter: string): string;
+var
+  i       : integer;
+  lDelim  : integer;
+  lStrings: integer;
+  pResult : PChar;
+  s       : string;
+begin
+  lDelim := Length(delimiter);
+  lStrings := 0;
+  for i := Low(strings) to High(strings) do begin
+    Inc(lStrings, Length(strings[i]));
+    if i < High(strings) then
+      Inc(lStrings, lDelim);
+  end;
+  SetLength(Result, lStrings);
+  pResult := @(Result[1]);
+  for i := Low(strings) to High(strings) do begin
+    s := strings[i];
+    if s <> '' then begin
+      Move(s[1], pResult^, Length(s) * SizeOf(char));
+      Inc(pResult, Length(s));
+    end;
+    if lDelim > 0 then begin
+      Move(delimiter[1], pResult^, lDelim * SizeOf(char));
+      Inc(pResult, lDelim);
+    end;
+  end;
+end; { Join }
+
+function ParamArray: TArray<string>;
+var
+  i: integer;
+begin
+  SetLength(Result, ParamCount);
+  for i := 1 to ParamCount do
+    Result[i-1] := ParamStr(i);
+end; { ParamArray }
+{$ENDIF GpStuff_TArrayOfT}
+
 function EnumFiles(const fileMask: string; attr: integer; returnFullPath: boolean;
-  enumSubfolders: boolean; maxEnumDepth: integer): IGpStringValueEnumeratorFactory;
+  enumSubfolders: boolean; maxEnumDepth: integer; ignoreDottedFolders: boolean): IGpStringValueEnumeratorFactory;
 var
   sl: TStringList;
 begin
   sl := TStringList.Create;
-  DSiEnumFilesToSL(fileMask, attr, sl, returnFullPath, enumSubfolders, maxEnumDepth);
+  DSiEnumFilesToSL(fileMask, attr, sl, returnFullPath, enumSubfolders, maxEnumDepth, ignoreDottedFolders);
   Result := TGpStringValueEnumeratorFactory.Create(sl);
 end; { EnumFiles }
 
+function IsInList(const value: string; const values: array of string; caseSensitive: boolean): boolean;
+var
+  s: string;
+begin
+  Result := true;
+  for s in EnumStrings(values) do
+    if caseSensitive then begin
+      if SameStr(value, s) then
+        Exit;
+    end
+    else if SameText(value, s) then
+      Exit;
+  Result := false;
+end; { IsInList }
 {$ENDIF GpStuff_ValuesEnumerators}
+
+function AddToList(const aList, delim, newElement: string): string;
+begin
+  Result := aList;
+  if Result <> '' then
+    Result := Result + delim;
+  Result := Result + newElement;
+end; { AddToList }
 
 {$IFDEF GpStuff_RegEx}
 function ParseURL(const url: string; var proto, host: string; var port: integer;
@@ -1504,20 +1753,45 @@ begin
 end; { FletcherChecksum }
 
 {$IFDEF GpStuff_NativeInt}
-function RoundUpTo(value: NativeInt; granularity: integer): NativeInt;
+function RoundDownTo(value: NativeInt; granularity: integer): NativeInt;
 {$ELSE}
-function RoundUpTo(value: NativeInt; granularity: integer): NativeInt;
+function RoundDownTo(value: integer; granularity: integer): integer;
 {$ENDIF GpStuff_NativeInt}
 begin
-  Result := (((value - 1) div granularity) + 1) * granularity;
-end;
+  Result := (value div granularity) * granularity;
+end; { RoundDownTo }
+
+function RoundDownTo(value: pointer; granularity: integer): pointer;
+begin
+  Result := pointer((NativeInt(value) div granularity) * granularity);
+end; { RoundDownTo }
+
+{$IFDEF GpStuff_NativeInt}
+function RoundUpTo(value: NativeInt; granularity: integer): NativeInt;
+{$ELSE}
+function RoundUpTo(value: integer; granularity: integer): integer;
+{$ENDIF GpStuff_NativeInt}
+begin
+  if value = 0 then
+    Result := 0
+  else
+    Result := (((value - 1) div granularity) + 1) * granularity;
+end; { RoundUpTo }
 
 function RoundUpTo(value: pointer; granularity: integer): pointer;
 begin
   Result := pointer((((NativeInt(value) - 1) div granularity) + 1) * granularity);
-end;
+end; { RoundUpTo }
 
-{$IFDEF   GpStuff_ValuesEnumerators}
+function GetRefCount(const intf: IInterface): integer;
+begin
+  Result := intf._AddRef - 1;
+  intf._Release;
+end; { GetRefCount }
+
+{ TGpDisableHandler }
+{$IFDEF GpStuff_ValuesEnumerators}
+
 constructor TGpDisableHandler.Create(const handler: PMethod);
 const
   CNilMethod: TMethod = (Code: nil; Data: nil);
@@ -1553,6 +1827,12 @@ begin
   Free;
   inherited;
 end; { TGpAutoDestroyObject.Destroy }
+
+function TGpAutoDestroyObject.Detach: TObject;
+begin
+  Result := FObject;
+  FObject := nil;
+end; { TGpAutoDestroyObject.Detach }
 
 procedure TGpAutoDestroyObject.Free;
 begin
@@ -1663,6 +1943,13 @@ begin
   Assign(data, size);
 end; { TGpBuffer.Create }
 
+constructor TGpBuffer.Create(stream: TStream);
+begin
+  Create;
+  if stream.Size > 0 then
+    FData.CopyFrom(stream, 0);
+end; { TGpBuffer.Create }
+
 destructor TGpBuffer.Destroy;
 begin
   FreeAndNil(FData);
@@ -1703,6 +1990,24 @@ begin
     Move(Value^, Result[1], Size);
 end; { TGpBuffer.GetAsAnsiString }
 
+function TGpBuffer.GetAsStream: TStream;
+begin
+  Result := FData;
+end; { TGpBuffer.GetAsStream }
+
+function TGpBuffer.GetAsString: string;
+begin
+  SetLength(Result, Size div SizeOf(char));
+  if Size > 0 then
+    Move(Value^, Result[1], Size);
+end; { TGpBuffer.GetAsString }
+
+function TGpBuffer.GetByteVal(idx: integer): byte;
+begin
+  Assert((idx >= 0) and (idx < Size));
+  Result := PByte(NativeUInt(Value) + NativeUInt(idx))^;
+end; { TGpBuffer.GetByteVal }
+
 function TGpBuffer.GetSize: integer;
 begin
   Result := FData.Size;
@@ -1725,6 +2030,20 @@ begin
   else
     Assign(@value[1], Length(value));
 end; { TGpBuffer.SetAsAnsiString }
+
+procedure TGpBuffer.SetAsString(const value: string);
+begin
+  if value = '' then
+    Clear
+  else
+    Assign(@value[1], Length(value) * SizeOf(char));
+end; { TGpBuffer.SetAsString }
+
+procedure TGpBuffer.SetByteVal(idx: integer; const value: byte);
+begin
+  Assert((idx >= 0) and (idx < Size));
+  PByte(NativeUInt(Value) + NativeUInt(idx))^ := value;
+end; { TGpBuffer.SetByteVal }
 
 { TGpInterfacedPersistent }
 
@@ -1764,5 +2083,36 @@ begin
   if Result = 0 then
     Destroy;
 end; { TGpInterfacedPersistent._Release }
+
+{$IFDEF GpStuff_Generics}
+class function Ternary<T>.IFF(condit: boolean; iftrue, iffalse: T): T;
+begin
+  if condit then
+    Result := iftrue
+  else
+    Result := iffalse;
+end;
+
+constructor TRec<T1, T2>.Create(Value1: T1; Value2: T2);
+begin
+  Field1 := Value1;
+  Field2 := Value2;
+end;
+
+constructor TRec<T1, T2, T3>.Create(Value1: T1; Value2: T2; Value3: T3);
+begin
+  Field1 := Value1;
+  Field2 := Value2;
+  Field3 := Value3;
+end;
+
+constructor TRec<T1, T2, T3, T4>.Create(Value1: T1; Value2: T2; Value3: T3; Value4: T4);
+begin
+  Field1 := Value1;
+  Field2 := Value2;
+  Field3 := Value3;
+  Field4 := Value4;
+end;
+{$ENDIF GpStuff_Generics}
 
 end.

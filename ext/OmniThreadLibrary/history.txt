@@ -1,5 +1,87 @@
+3.05: 2015-09-07
+
+- New features:
+  - Added Delphi 10 Seattle packages and projects.
+  - Setting IOmniThreadPool.MinWorkers property will start up idle worker threads 
+    if total number of threads managed by the thread pool is lower than the new value.
+- Bug fixes:
+  - Fixed 'record' type handling in TOmniValue.FromArray<T> and TOmniValue.ToArray<T>.
+  - Reimplemented support for > 60 worker tasks in the OtlThreadPool unit which 
+    was removed from the code in 3.04a by mistake.
+  - IOmniPipeline.PipelineStage[].Input and .Output are now always available
+    immediately after the IOmniPipeline.Run.    
+  - TOmniPipeline.Destroy calls TOmniPipeline.Cancel so a pipeline can be 
+    shut down if user forgets to call Input.CompleteAdding.
+  - When the code was waiting on less than 64 handles and timeout occurred, 
+    the TWaitFor.Signalled[] property was not always empty.
+  - TWaitFor was not working correctly with more than 64 handles if it was
+    created with the parameter-less constructor.
+  - TWaitFor.MsgWaitAny now uses RegisterWaitForSingleObject approach when
+    waiting on 64 handles. Previously, MsgWaitForMultipleObjectsEx was called,
+    which can only handle up to 63 handles.
+  - Fixed pointer arithmetic in DetailedRTTI for 64-bit compilation.
+  - Fixed: affinity mask in IOmniAffinity was only 32-bit wide on 64-bit platform.
+
+3.04b: 2015-07-29
+- New features:
+  - Implemented TOmniSingleThreadUseChecker, a record which checks that the owner 
+    is only used from one thread. 
+  - TOmniCommunicationEndpoint.ReceiveWait and .SendWait are now fully thread-safe
+    and support multiple consumers (former) and multiple producers (latter).
+- Bug fixes:
+  - Reimplemented support for TWaitFor in the TOmniTaskControl which was removed
+    from the code in 3.04a by mistake.
+
+3.04a: 2015-05-14
+- New features:
+  - Added XE8 packages and projects.
+  - Tested with XE8.
+- Bug fixes:  
+  - DSiWin32
+    - Fixed DSiClassWndProc parameter types for Win64.
+    - DSiClassWndProc catches exceptions in instance's WndProc.
+    - Fixed Affinity functions to work with up to 64 cores in 64-bit mode.
+  - Added vtWideChar and vtPWideChar handling to TOmniValue.Create and .CreateNamed.
+  - TOmniCS.GetLockCount won't crash if Initialize was not called yet.
+  - Fixed Affinity functions in Environment to work with up to 64 cores in 64-bit mode.
+
+3.04: 2015-03-01
+- New features:
+  - Implemented simple and fast Parallel.&For which supports only integer ranges.
+  - Implemented Parallel.Map.
+  - Added overloaded Execute methods to IOmniParallelInitializedLoop and
+    IOmniParallelInitializedLoop<T> so that IOmniTask parameter can be passed
+    to the executor.
+  - Implemented Run overloads that internally call Invoke to start
+    thread worker.
+  - Implemented TOmniValue.HasArrayItem.
+  - Implemented TWaitFor which supports waiting any/all and is not
+    limited to 63 objects.
+  - IOmniTaskControl can wait on any number of comm handles and wait objects.
+    That enables support for >60 tasks in the OtlThreadPool. 
+  - Implemented TOmniBlockingCollection.ToArray<T>.
+  - NumTasks parameter (OtlParallel) can be negative. In that case, specified 
+    number of cores will be reserved for other purposes and all other will 
+    be used for processing.
+    Example: If NumTasks(-2) is used when process has access to 8 cores,
+    6 of them (8 - 2) will be used to run the task.  
+  - Removed project groups.
+  - Tested with 2007-XE7.
 - Bug fixes:
   - Fixed race condition in IOmniPipeline termination code [tnx to Dean Hill].
+  - Creating parameters with the array overload
+    (IOmniTaskControl.SetParameters(['From', 0, 'To', 99])) was not working.
+  - Fixed problems in demos 33_BlockingCollection and 47_TaskConfig.
+- New demos:
+  - 55_ForEachProgress: Demonstrates progress bar updating from a ForEach loop.
+  - 56_RunInvoke: Simplified 'run & invoke' low-level API.
+  - 57_For: Simple and fast parallel for.
+  - 58_ForVsForEach: Speed comparison between Parallel.ForEach, Parallel.For, 
+    and TParallel.For (XE7+).
+  - 59_TWaitFor: Demo for the new TWaitFor class.
+  - 60_Map: Demonstrates the new Parallel.Map abstraction.
+  - 61_CollectionToArray: Demonstrates the new TOmniBlockingCollection.ToArray<T>
+    method.
 
 3.03a: 2013-10-21
 - Bug fixes:
