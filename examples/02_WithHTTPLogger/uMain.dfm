@@ -25,7 +25,7 @@ object Main: TMain
     Anchors = [akLeft, akTop, akRight, akBottom]
     Focusable = False
     TabOrder = 0
-    Properties.ActivePage = cxTSPostRequest
+    Properties.ActivePage = cxTSGetRequest
     Properties.CustomButtons.Buttons = <>
     ClientRectBottom = 249
     ClientRectLeft = 4
@@ -34,10 +34,6 @@ object Main: TMain
     object cxTSGetRequest: TcxTabSheet
       Caption = 'GET-Request'
       ImageIndex = 0
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       DesignSize = (
         611
         225)
@@ -46,7 +42,7 @@ object Main: TMain
         Top = 16
         Anchors = [akLeft, akTop, akRight]
         TabOrder = 0
-        Text = 'http://www.google.de/search?q=http+indy'
+        Text = 'https://www.google.de/search?q=http+indy'
         Width = 498
       end
       object bGET: TButton

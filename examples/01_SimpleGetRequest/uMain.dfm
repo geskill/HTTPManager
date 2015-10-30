@@ -34,7 +34,7 @@ object Main: TMain
     Height = 21
     Anchors = [akLeft, akTop, akRight]
     TabOrder = 1
-    Text = 'http://www.google.de/search?q=http+indy'
+    Text = 'https://www.google.de/search?q=http+indy'
   end
   object bGET: TButton
     Left = 415
