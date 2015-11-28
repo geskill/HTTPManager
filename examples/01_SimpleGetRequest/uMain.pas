@@ -9,7 +9,7 @@ uses
   // OmniThreadLibrary
   OtlParallel, OtlTaskControl,
   // IdHTTPManager
-  uHTTPInterface, uHTTPManager, uHTTPClasses;
+  uHTTPInterface, uHTTPManager, uHTTPClasses, uHTTPIndyImplementor;
 
 type
   TMain = class(TForm)

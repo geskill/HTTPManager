@@ -68,6 +68,10 @@ object Main: TMain
     object cxTSPostRequest: TcxTabSheet
       Caption = 'POST-Request'
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       DesignSize = (
         611
         225)

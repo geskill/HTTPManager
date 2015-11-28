@@ -315,10 +315,23 @@ type
     property Name: WideString read GetName;
   end;
 
+  IHTTPImplementationManager = interface(IUnknown)
+    ['{9908E7A3-E2B5-40F4-9412-723F0D4686E6}']
+    function GetCount: Integer; safecall;
+    function GetImplementation(AIndex: Integer): IHTTPImplementation; safecall;
+
+    function Register(const AHTTPImplementation: IHTTPImplementation): WordBool; safecall;
+    function Unregister(const AName: WideString): WordBool; safecall;
+
+    property Count: Integer read GetCount;
+    property Implementations[Index: Integer]: IHTTPImplementation read GetImplementation; default;
+  end;
+
   IHTTPManager = interface
     ['{DB7FBA4F-CE5C-454A-AA74-FB8EC7DFAB8E}']
     function GetImplementor: IHTTPImplementation; safecall;
     procedure SetImplementor(const AImplementor: IHTTPImplementation); safecall;
+    function GetImplementationManager: IHTTPImplementationManager; safecall;
     function GetRequestDone: IHTTPProcessEvent; safecall;
 
     function Get(AURL: WideString; AFollowUp: Double; AHTTPOptions: IHTTPOptions = nil): Double; overload; safecall;
@@ -330,6 +343,7 @@ type
     function GetResult(AUniqueID: Double): IHTTPProcess; safecall;
 
     property Implementor: IHTTPImplementation read GetImplementor write SetImplementor;
+    property ImplementationManager: IHTTPImplementationManager read GetImplementationManager;
 
     property OnRequestDone: IHTTPProcessEvent read GetRequestDone;
   end;

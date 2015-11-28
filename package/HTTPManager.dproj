@@ -24,7 +24,7 @@
 			<DesignOnlyPackage>false</DesignOnlyPackage>
 			<DCC_DcuOutput>../lib</DCC_DcuOutput>
 			<DCC_UnitAlias>WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;$(DCC_UnitAlias)</DCC_UnitAlias>
-			<DCC_DependencyCheckOutputName>..\..\..\..\..\..\..\Public\Documents\RAD Studio\7.0\Bpl\HTTPManager.bpl</DCC_DependencyCheckOutputName>
+			<DCC_DependencyCheckOutputName>..\..\..\..\..\..\Public\Documents\RAD Studio\7.0\Bpl\HTTPManager.bpl</DCC_DependencyCheckOutputName>
 			<GenPackage>true</GenPackage>
 			<GenDll>true</GenDll>
 			<DCC_ImageBase>00400000</DCC_ImageBase>
@@ -108,6 +108,7 @@
 						<VersionInfoKeys Name="Comments"/>
 					</VersionInfoKeys>
 				</Delphi.Personality>
+				<ModelSupport>False</ModelSupport>
 			</BorlandProject>
 			<ProjectFileVersion>12</ProjectFileVersion>
 		</ProjectExtensions>

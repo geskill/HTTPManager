@@ -7,11 +7,11 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls,
   // Dev Express
-  cxPCdxBarPopupMenu, cxGraphics, cxControls, cxLookAndFeels, cxLookAndFeelPainters, cxPC, cxContainer, cxEdit, cxTextEdit,
+  cxPCdxBarPopupMenu, cxGraphics, cxControls, cxLookAndFeels, cxLookAndFeelPainters, cxPC, cxContainer, cxEdit, cxTextEdit, dxBarBuiltInMenu,
   // OmniThreadLibrary
   OtlParallel, OtlTaskControl,
   // IdHTTPManager
-  uHTTPInterface, uHTTPManager, uHTTPClasses, dxBarBuiltInMenu;
+  uHTTPInterface, uHTTPManager, uHTTPClasses, uHTTPIndyImplementor;
 
 type
   TMain = class(TForm)

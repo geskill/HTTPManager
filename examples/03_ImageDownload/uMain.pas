@@ -11,7 +11,7 @@ uses
   // OmniThreadLibrary
   OtlParallel, OtlTaskControl,
   // IdHTTPManager
-  uHTTPInterface, uHTTPManager, uHTTPClasses,
+  uHTTPInterface, uHTTPManager, uHTTPClasses, uHTTPIndyImplementor,
   // Utils
   uImageUtils;
 
@@ -112,20 +112,20 @@ end;
 
 procedure TMain.DrawImage(AMemoryStream: TMemoryStream);
 var
-  _img_jpeg: TJPEGImage;
+  _img_jpg: TJPEGImage;
   _img_png: TdxPNGImage;
   _img_gif: TGIFImage;
 begin
   AMemoryStream.Position := 0;
 
-  if IsJPEG(AMemoryStream) then
+  if IsJPG(AMemoryStream) then
   begin
-    _img_jpeg := TJPEGImage.Create;
+    _img_jpg := TJPEGImage.Create;
     try
-      _img_jpeg.LoadFromStream(AMemoryStream);
-      Image.Picture.Bitmap.Assign(_img_jpeg);
+      _img_jpg.LoadFromStream(AMemoryStream);
+      Image.Picture.Bitmap.Assign(_img_jpg);
     finally
-      _img_jpeg.Free;
+      _img_jpg.Free;
     end;
   end
   else if IsPNG(AMemoryStream) then

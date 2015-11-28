@@ -20,17 +20,20 @@ function IsBMP(const AFileName: String): Boolean; overload;
 function IsGIF(const AFileStream: TStream): Boolean; overload;
 function IsGIF(const AFileName: String): Boolean; overload;
 
-function IsJPEG(const AFileStream: TStream): Boolean; overload;
-function IsJPEG(const AFileName: String): Boolean; overload;
+function IsJPG(const AFileStream: TStream): Boolean; overload;
+function IsJPG(const AFileName: String): Boolean; overload;
 
 function IsPNG(const AFileStream: TStream): Boolean; overload;
 function IsPNG(const AFileName: String): Boolean; overload;
+
+function IsTIF(const AFileStream: TStream): Boolean; overload;
+function IsTIF(const AFileName: String): Boolean; overload;
 
 implementation
 
 function GetTGraphicType(AStream: TStream): TGraphicMeta;
 begin
-  if IsJPEG(AStream) then
+  if IsJPG(AStream) then
     Result := TJPEGImage
   else if IsBMP(AStream) then
     Result := TBitmap
@@ -38,13 +41,15 @@ begin
     Result := TdxPNGImage
   else if IsGIF(AStream) then
     Result := TGIFImage
+  else if IsTIF(AStream) then
+    Result := TWicImage
   else
     raise Exception.Create('Unknown image format');
 end;
 
 function GetTGraphicFileExt(AStream: TStream): string;
 begin
-  if IsJPEG(AStream) then
+  if IsJPG(AStream) then
     Result := '.jpg'
   else if IsBMP(AStream) then
     Result := '.bmp'
@@ -52,6 +57,8 @@ begin
     Result := '.png'
   else if IsGIF(AStream) then
     Result := '.gif'
+  else if IsTIF(AStream) then
+    Result := '.tif'
   else
     Result := '';
 end;
@@ -106,7 +113,7 @@ begin
   Result := Buffer = $4947;
 end;
 
-function IsJPEG(const AFileStream: TStream): Boolean;
+function IsJPG(const AFileStream: TStream): Boolean;
 var
   Buffer: Word;
 begin
@@ -119,7 +126,7 @@ begin
   end;
 end;
 
-function IsJPEG(const AFileName: String): Boolean;
+function IsJPG(const AFileName: String): Boolean;
 var
   FileHandle: Integer;
   Buffer: Word;
@@ -133,13 +140,13 @@ end;
 
 function IsPNG(const AFileStream: TStream): Boolean;
 var
-  Buf: Int64;
+  Buffer: Int64;
 begin
   with AFileStream do
   begin
     Position := 0;
-    Read(Buf, 8);
-    Result := (Buf = $0A1A0A0D474E5089);
+    Read(Buffer, 8);
+    Result := (Buffer = $0A1A0A0D474E5089);
     Position := 0;
   end;
 end;
@@ -147,13 +154,42 @@ end;
 function IsPNG(const AFileName: String): Boolean;
 var
   FileHandle: Integer;
-  Buf: Int64;
+  Buffer: Int64;
 begin
   FileHandle := FileOpen(AFileName, fmOpenRead);
   FileSeek(FileHandle, 0, 0);
-  FileRead(FileHandle, Buf, 8);
+  FileRead(FileHandle, Buffer, 8);
   FileClose(FileHandle);
-  Result := (Buf = $0A1A0A0D474E5089);
+  Result := (Buffer = $0A1A0A0D474E5089);
+end;
+
+function IsTIF(const AFileStream: TStream): Boolean;
+var
+  Buffer1, Buffer2: Word;
+begin
+  with AFileStream do
+  begin
+    Position := 0;
+    Read(Buffer1, 2);
+    Position := 2;
+    Read(Buffer2, 2);
+    Result := ((Buffer1 = $4949) and (Buffer2 = $002A)) or ((Buffer1 = $4D4D) and (Buffer2 = $2A00));
+    Position := 0;
+  end;
+end;
+
+function IsTIF(const AFileName: String): Boolean;
+var
+  FileHandle: Integer;
+  Buffer1, Buffer2: Word;
+begin
+  FileHandle := FileOpen(AFileName, fmOpenRead);
+  FileSeek(FileHandle, 0, 0);
+  FileRead(FileHandle, Buffer1, 2);
+  FileSeek(FileHandle, 2, 0);
+  FileRead(FileHandle, Buffer2, 2);
+  FileClose(FileHandle);
+  Result := ((Buffer1 = $4949) and (Buffer2 = $002A)) or ((Buffer1 = $4D4D) and (Buffer2 = $2A00));
 end;
 
 end.

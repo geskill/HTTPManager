@@ -22,14 +22,30 @@ uses
   uHTTPConst,
   // Events
   uHTTPEvent,
-  // Implementor
-  uHTTPIndyImplementor,
   // Delphi
-  Windows, SysUtils, Math,
+  Windows, SysUtils, Classes, Math, ActiveX,
   // OmniThreadLibrary
   OtlCommon, OtlSync, OtlParallel;
 
 type
+  THTTPImplementationManager = class(TInterfacedObject, IHTTPImplementationManager)
+  private
+    FImplementations: TInterfaceList;
+    function FindImplementation(const AName: WideString): IHTTPImplementation;
+  protected
+    function GetCount: Integer; safecall;
+    function GetImplementation(AIndex: Integer): IHTTPImplementation; safecall;
+  public
+    constructor Create; virtual;
+    destructor Destroy; override;
+
+    function Register(const AHTTPImplementation: IHTTPImplementation): WordBool; safecall;
+    function Unregister(const AName: WideString): WordBool; safecall;
+
+    property Count: Integer read GetCount;
+    property Implementations[Index: Integer]: IHTTPImplementation read GetImplementation; default;
+  end;
+
 {$REGION 'Documentation'}
   /// <summary>
   /// <para>
@@ -61,6 +77,7 @@ type
     FRequestArray: array of IHTTPProcess;
     FRequestArrayLock: TOmniMREW;
     FImplementor: IHTTPImplementation;
+    FImplementationManager: IHTTPImplementationManager;
     FRequestDoneEvent: IHTTPProcessEvent;
 
     class var FHTTPManager: IHTTPManager;
@@ -75,6 +92,7 @@ type
   protected
     function GetImplementor: IHTTPImplementation; safecall;
     procedure SetImplementor(const AImplementor: IHTTPImplementation); safecall;
+    function GetImplementationManager: IHTTPImplementationManager; safecall;
     function GetRequestDone: IHTTPProcessEvent; safecall;
   public
 {$REGION 'Documentation'}
@@ -192,6 +210,7 @@ type
     function GetResult(AUniqueID: Double): IHTTPProcess; safecall;
 
     property Implementor: IHTTPImplementation read GetImplementor write SetImplementor;
+    property ImplementationManager: IHTTPImplementationManager read GetImplementationManager;
 {$REGION 'Documentation'}
     /// <summary>
     /// This event occurs when a HTTP request is processed.
@@ -207,7 +226,71 @@ type
 
 implementation
 
-  { TIdHTTPManager }
+{ THTTPImplementationManager }
+
+function THTTPImplementationManager.FindImplementation(const AName: WideString): IHTTPImplementation;
+var
+  LImplementationIndex: Integer;
+  LImplementation: IHTTPImplementation;
+begin
+  Result := nil;
+
+  for LImplementationIndex := 0 to FImplementations.Count - 1 do
+  begin
+    LImplementation := Implementations[LImplementationIndex];
+
+    if SameText(AName, LImplementation.Name) then
+    begin
+      Result := LImplementation;
+      break;
+    end;
+  end;
+end;
+
+function THTTPImplementationManager.GetCount: Integer;
+begin
+  Result := FImplementations.Count;
+end;
+
+function THTTPImplementationManager.GetImplementation(AIndex: Integer): IHTTPImplementation;
+begin
+  Result := FImplementations.Items[AIndex] as IHTTPImplementation;
+end;
+
+constructor THTTPImplementationManager.Create;
+begin
+  inherited Create;
+  FImplementations := TInterfaceList.Create;
+end;
+
+destructor THTTPImplementationManager.Destroy;
+begin
+  FImplementations.Free;
+  inherited Destroy;
+end;
+
+function THTTPImplementationManager.Register(const AHTTPImplementation: IHTTPImplementation): WordBool;
+begin
+  Result := not Assigned(FindImplementation(AHTTPImplementation.Name));
+  if Result then
+    FImplementations.Add(AHTTPImplementation)
+end;
+
+function THTTPImplementationManager.Unregister(const AName: WideString): WordBool;
+var
+  LImplementation: IHTTPImplementation;
+begin
+  LImplementation := FindImplementation(AName);
+  Result := Assigned(LImplementation);
+  if Result then
+    try
+      FImplementations.Remove(LImplementation);
+    finally
+      LImplementation := nil;
+    end;
+end;
+
+{ TIdHTTPManager }
 {$REGION 'HandleBlockingScripts'}
   (*
     procedure THTTPManager.HandleBlockingScripts(AHTTPHelper: THTTPHelper; AWebsite:string; AHTTPResponse: IHTTPResponse);
@@ -273,16 +356,11 @@ var
 begin
   HTTPData := IHTTPData(workItem.Data.AsInterface);
 
-  if Assigned(FImplementor) then
-  begin
-    try
-      FImplementor.Handle(HTTPData, HTTPResult);
-    except
-      OutputDebugString('Error!');
-    end;
-  end
-  else
-    raise Exception.Create('Assign a HTTPImplementor');
+  try
+    Implementor.Handle(HTTPData, HTTPResult);
+  except
+    OutputDebugString('HTTPManager execute error');
+  end;
 
   workItem.Result := TOmniValue.CastFrom(HTTPResult);
 end;
@@ -319,9 +397,14 @@ end;
 
 constructor THTTPManager.Create;
 begin
+  CoInitializeEx(nil, COINIT_MULTITHREADED);
+
   FBackgroundWorker := Parallel.BackgroundWorker;
 
-  FImplementor := THTTPIndyImplementation.Create;
+  SetLength(FRequestArray, 0);
+
+  FImplementor := nil;
+  FImplementationManager := THTTPImplementationManager.Create;
 
   FRequestDoneEvent := TIHTTPProcessEvent.Create;
 
@@ -349,13 +432,24 @@ begin
     { } begin
     { . } FRequestDoneEvent.Invoke(GetResult(workItem.UniqueID));
     { } end);
-
-  SetLength(FRequestArray, 0);
 end;
 
 function THTTPManager.GetImplementor: IHTTPImplementation;
 begin
+  if not Assigned(FImplementor) then
+  begin
+    if ImplementationManager.Count > 0 then
+      FImplementor := ImplementationManager.Implementations[0]
+    else
+      raise Exception.Create('Assign a HTTPImplementor');
+  end;
+
   Result := FImplementor;
+end;
+
+function THTTPManager.GetImplementationManager: IHTTPImplementationManager;
+begin
+  Result := FImplementationManager;
 end;
 
 procedure THTTPManager.SetImplementor(const AImplementor: IHTTPImplementation);
@@ -430,7 +524,6 @@ begin
 
   Index := Trunc(AUniqueID);
 
-  OutputDebugString(PChar('THTTPManager START GetResult'));
   FRequestArrayLock.EnterReadLock;
   try
     if Index < length(FRequestArray) then
@@ -438,18 +531,20 @@ begin
   finally
     FRequestArrayLock.ExitReadLock;
   end;
-  OutputDebugString(PChar('THTTPManager END GetResult'));
 end;
 
 destructor THTTPManager.Destroy;
 begin
   FRequestDoneEvent := nil;
+  FImplementationManager := nil;
   FImplementor := nil;
 
   SetLength(FRequestArray, 0);
 
   FBackgroundWorker.Terminate(INFINITE);
   FBackgroundWorker := nil;
+
+  CoUninitialize;
 
   inherited Destroy;
 end;
