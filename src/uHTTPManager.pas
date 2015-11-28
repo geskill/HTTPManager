@@ -76,6 +76,8 @@ type
     FBackgroundWorker: IOmniBackgroundWorker;
     FRequestArray: array of IHTTPProcess;
     FRequestArrayLock: TOmniMREW;
+    FConnectionMaximum: Integer;
+    FConnectionMaximumLock: TOmniMREW;
     FImplementor: IHTTPImplementation;
     FImplementationManager: IHTTPImplementationManager;
     FRequestDoneEvent: IHTTPProcessEvent;
@@ -90,6 +92,8 @@ type
 
     constructor Create;
   protected
+    function GetConnectionMaximum: Integer; safecall;
+    procedure SetConnectionMaximum(const AConnectionMaximum: Integer); safecall;
     function GetImplementor: IHTTPImplementation; safecall;
     procedure SetImplementor(const AImplementor: IHTTPImplementation); safecall;
     function GetImplementationManager: IHTTPImplementationManager; safecall;
@@ -113,6 +117,8 @@ type
     class function Instance(): IHTTPManager;
     class procedure Wait(ARequestID: Double; AMilliseconds: Integer = 50);
     class destructor Destroy;
+
+    property ConnectionMaximum: Integer read GetConnectionMaximum write SetConnectionMaximum;
 {$REGION 'Documentation'}
     /// <summary>
     /// <para>
@@ -403,12 +409,13 @@ begin
 
   SetLength(FRequestArray, 0);
 
+  FConnectionMaximum := 1;
   FImplementor := nil;
   FImplementationManager := THTTPImplementationManager.Create;
 
   FRequestDoneEvent := TIHTTPProcessEvent.Create;
 
-  FBackgroundWorker.NumTasks(1).Execute(Execute).OnRequestDone_Asy(
+  FBackgroundWorker.NumTasks(FConnectionMaximum).Execute(Execute).OnRequestDone_Asy(
     { } procedure(const Sender: IOmniBackgroundWorker; const workItem: IOmniWorkItem)
     { } var
     { . } HTTPProcess: IHTTPProcess;
@@ -487,6 +494,30 @@ end;
 class destructor THTTPManager.Destroy;
 begin
   FHTTPManager := nil;
+end;
+
+function THTTPManager.GetConnectionMaximum: Integer;
+begin
+  FConnectionMaximumLock.EnterReadLock;
+  try
+    Result := FConnectionMaximum;
+  finally
+    FConnectionMaximumLock.ExitReadLock
+  end;
+end;
+
+procedure THTTPManager.SetConnectionMaximum(const AConnectionMaximum: Integer);
+begin
+  FConnectionMaximumLock.EnterWriteLock;
+  try
+    if not (AConnectionMaximum = FConnectionMaximum) then
+    begin
+      FConnectionMaximum := AConnectionMaximum;
+      FBackgroundWorker.NumTasks(AConnectionMaximum);
+    end;
+  finally
+    FConnectionMaximumLock.ExitWriteLock
+  end;
 end;
 
 function THTTPManager.Get(AURL: WideString; AFollowUp: Double; AHTTPOptions: IHTTPOptions = nil): Double;

@@ -329,10 +329,14 @@ type
 
   IHTTPManager = interface
     ['{DB7FBA4F-CE5C-454A-AA74-FB8EC7DFAB8E}']
+    function GetConnectionMaximum: Integer; safecall;
+    procedure SetConnectionMaximum(const AConnectionMaximum: Integer); safecall;
     function GetImplementor: IHTTPImplementation; safecall;
     procedure SetImplementor(const AImplementor: IHTTPImplementation); safecall;
     function GetImplementationManager: IHTTPImplementationManager; safecall;
     function GetRequestDone: IHTTPProcessEvent; safecall;
+
+    property ConnectionMaximum: Integer read GetConnectionMaximum write SetConnectionMaximum;
 
     function Get(AURL: WideString; AFollowUp: Double; AHTTPOptions: IHTTPOptions = nil): Double; overload; safecall;
     function Get(AHTTPRequest: IHTTPRequest; AHTTPOptions: IHTTPOptions = nil): Double; overload; safecall;
