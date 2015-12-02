@@ -294,6 +294,18 @@ type
     property HTTPResult: IHTTPResult read GetHTTPResult write SetHTTPResult;
   end;
 
+  IHTTPScrapeEventHandler = interface(IUnknown)
+    ['{C603F8DD-2789-4601-BF5A-A386CEEC4E56}']
+    procedure Invoke(const AHTTPProcess: IHTTPProcess; out AHTTPData: IHTTPData; var AHandled: WordBool); safecall;
+  end;
+
+  IHTTPScrapeEvent = interface(IUnknown)
+    ['{058E81B9-E661-4C58-A56F-4F0D41D4350B}']
+    procedure Add(const AHandler: IHTTPScrapeEventHandler); safecall;
+    procedure Remove(const AHandler: IHTTPScrapeEventHandler); safecall;
+    procedure Invoke(const AHTTPProcess: IHTTPProcess; out AHTTPData: IHTTPData; var AHandled: WordBool); safecall;
+  end;
+
   IHTTPProcessEventHandler = interface(IUnknown)
     ['{2FBF518D-3E91-4BFF-9713-D9BC872F1813}']
     procedure Invoke(const AHTTPProcess: IHTTPProcess); safecall;
@@ -334,6 +346,7 @@ type
     function GetImplementor: IHTTPImplementation; safecall;
     procedure SetImplementor(const AImplementor: IHTTPImplementation); safecall;
     function GetImplementationManager: IHTTPImplementationManager; safecall;
+    function GetRequestScrape: IHTTPScrapeEvent; safecall;
     function GetRequestDone: IHTTPProcessEvent; safecall;
 
     property ConnectionMaximum: Integer read GetConnectionMaximum write SetConnectionMaximum;
@@ -349,6 +362,7 @@ type
     property Implementor: IHTTPImplementation read GetImplementor write SetImplementor;
     property ImplementationManager: IHTTPImplementationManager read GetImplementationManager;
 
+    property OnRequestScrape: IHTTPScrapeEvent read GetRequestScrape;
     property OnRequestDone: IHTTPProcessEvent read GetRequestDone;
   end;
 
