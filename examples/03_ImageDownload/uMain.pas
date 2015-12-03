@@ -79,30 +79,36 @@ var
   OleStream: TOleStream;
   Dummy: Int64;
 begin
-  HTTPManager := THTTPManager.Instance();
-
   AMemoryStream := TMemoryStream.Create;
 
-  HTTPOptions := THTTPOptions.Create(TProxy.Create);
-
-  HTTPOptions.ConnectTimeout := 10000;
-  HTTPOptions.ReadTimeout := 25000;
-
-  RequestID := HTTPManager.Get(THTTPRequest.Create(AImageLink), HTTPOptions);
-
-  repeat
-    sleep(75);
-  until HTTPManager.HasResult(RequestID);
-
-  HTTPProcess := HTTPManager.GetResult(RequestID);
-
-  OleStream := TOleStream.Create(HTTPProcess.HTTPResult.HTTPResponse.ContentStream);
+  // Required, because of TOleStream usage.
+  CoInitializeEx(nil, COINIT_MULTITHREADED);
   try
-    HTTPProcess.HTTPResult.HTTPResponse.ContentStream.Seek(0, STREAM_SEEK_SET, Dummy);
-    OleStream.Seek(0, STREAM_SEEK_SET);
-    AMemoryStream.CopyFrom(OleStream, OleStream.Size);
+    HTTPManager := THTTPManager.Instance();
+
+    HTTPOptions := THTTPOptions.Create(TProxy.Create);
+
+    HTTPOptions.ConnectTimeout := 10000;
+    HTTPOptions.ReadTimeout := 25000;
+
+    RequestID := HTTPManager.Get(THTTPRequest.Create(AImageLink), HTTPOptions);
+
+    repeat
+      sleep(75);
+    until HTTPManager.HasResult(RequestID);
+
+    HTTPProcess := HTTPManager.GetResult(RequestID);
+
+    OleStream := TOleStream.Create(HTTPProcess.HTTPResult.HTTPResponse.ContentStream);
+    try
+      HTTPProcess.HTTPResult.HTTPResponse.ContentStream.Seek(0, STREAM_SEEK_SET, Dummy);
+      OleStream.Seek(0, STREAM_SEEK_SET);
+      AMemoryStream.CopyFrom(OleStream, OleStream.Size);
+    finally
+      OleStream.Free;
+    end;
   finally
-    OleStream.Free;
+    CoUninitialize;
   end;
 
   HTTPProcess := nil;

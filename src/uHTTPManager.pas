@@ -341,8 +341,10 @@ begin
 
       HTTPProcess := THTTPProcess.Create(workItem.UniqueID);
       HTTPProcess.HTTPData := ScrapeData;
-      HTTPProcess.HTTPData.HTTPRequest.Referer := HTTPData.HTTPRequest.URL;
       HTTPProcess.HTTPResult := ScrapeResult;
+
+      HTTPProcess.HTTPData.HTTPRequest.URL := HTTPData.HTTPRequest.URL;
+      HTTPProcess.HTTPData.HTTPRequest.Referer := HTTPData.HTTPRequest.URL;
 
       ScrapedData := THTTPData.Create(THTTPRequest.FollowUpClone(HTTPProcess, HTTPData.HTTPRequest), HTTPData.HTTPOptions, HTTPData.HTTPParams);
       HTTPProcess := nil;

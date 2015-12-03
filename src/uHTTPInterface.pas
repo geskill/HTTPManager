@@ -207,11 +207,11 @@ type
     ['{F1ED2AAD-88F0-45BE-B9F2-E01E01616608}']
     function GetWebsite: WideString; safecall;
     function GetHTTPParams: IHTTPParams; safecall;
-    procedure SetHTTPParams(AHTTPParams: IHTTPParams); safecall;
+    procedure SetHTTPParams(const AHTTPParams: IHTTPParams); safecall;
     function GetHTTPRequest: IHTTPRequest; safecall;
-    procedure SetHTTPRequest(AHTTPRequest: IHTTPRequest); safecall;
+    procedure SetHTTPRequest(const AHTTPRequest: IHTTPRequest); safecall;
     function GetHTTPOptions: IHTTPOptions; safecall;
-    procedure SetHTTPOptions(AHTTPOptions: IHTTPOptions); safecall;
+    procedure SetHTTPOptions(const AHTTPOptions: IHTTPOptions); safecall;
 
     property Website: WideString read GetWebsite;
     property HTTPParams: IHTTPParams read GetHTTPParams write SetHTTPParams;
@@ -285,9 +285,9 @@ type
     ['{93FDB9BC-F325-4E98-B548-DF5D9C339189}']
     function GetUniqueID: Double; safecall;
     function GetHTTPData: IHTTPData; safecall;
-    procedure SetHTTPData(AHTTPData: IHTTPData); safecall;
+    procedure SetHTTPData(const AHTTPData: IHTTPData); safecall;
     function GetHTTPResult: IHTTPResult; safecall;
-    procedure SetHTTPResult(AHTTPResult: IHTTPResult); safecall;
+    procedure SetHTTPResult(const AHTTPResult: IHTTPResult); safecall;
 
     property UniqueID: Double read GetUniqueID;
     property HTTPData: IHTTPData read GetHTTPData write SetHTTPData;

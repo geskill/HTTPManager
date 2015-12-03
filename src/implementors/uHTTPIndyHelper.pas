@@ -155,7 +155,7 @@ end;
 
 function THTTPIndyHelper.IsWrongProtocolException(ALowerCaseSourceCode: string): Boolean;
 begin
-  Result := (not(Pos('<body', ALowerCaseSourceCode) = 0))
+  Result := (not(Pos('<body', ALowerCaseSourceCode) = 0));
 end;
 
 procedure THTTPIndyHelper.WriteErrorMsgToStream(AMsg: string; AStream: TStream);
