@@ -138,12 +138,12 @@ begin
 
     if LCanHandleCloudflare then
     begin
-      Sleep(4500);
+      Sleep(5000);
 
       LParams := 'jschl_vc=' + jschl_vc + '&jschl_answer=' + jschl_answer + '&pass=' + pass;
-      LURL := LProtocol + '://' + LHost + '/cdn-cgi/l/chk_jschl?' + LParams;
+      LURL := LProtocol + '://' + LHost;
 
-      HTTPRequest := THTTPRequest.Create(LURL);
+      HTTPRequest := THTTPRequest.Create(LURL + '/cdn-cgi/l/chk_jschl?' + LParams);
       with HTTPRequest do
       begin
         Method := mGET;
