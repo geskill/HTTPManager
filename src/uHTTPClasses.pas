@@ -850,8 +850,7 @@ begin
 
   Cookies.Text := AHTTPProcess.HTTPData.HTTPRequest.Cookies.Text + AHTTPProcess.HTTPResult.HTTPResponse.Cookies.Text + ANewHTTPProcess.Cookies.Text;
 
-  CustomHeaders.Text := AHTTPProcess.HTTPData.HTTPRequest.CustomHeaders.Text + AHTTPProcess.HTTPResult.HTTPResponse.CustomHeaders.Text +
-    ANewHTTPProcess.CustomHeaders.Text;
+  CustomHeaders.Text := AHTTPProcess.HTTPData.HTTPRequest.CustomHeaders.Text + AHTTPProcess.HTTPResult.HTTPResponse.CustomHeaders.Text + ANewHTTPProcess.CustomHeaders.Text;
 end;
 
 constructor THTTPRequest.FollowUpClone(const AHTTPProcess: IHTTPProcess; AHTTPMethod: THTTPMethod; AURL: string);
