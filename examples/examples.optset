@@ -1,6 +1,6 @@
 ﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 		<PropertyGroup>
-			<DCC_UnitSearchPath>../../src;../../src/implementors;../../ext/MultiEvent;../../ext/OmniThreadLibrary;../../ext/OmniThreadLibrary\src;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+			<DCC_UnitSearchPath>../../src;../../src\antiscrape;../../src\implementors;../../ext\BESEN\src;../../ext\MultiEvent;../../ext\OmniThreadLibrary;../../ext\OmniThreadLibrary\src;../../ext\TRegExpr\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
 		</PropertyGroup>
 		<ProjectExtensions>
 			<Borland.Personality>Delphi.Personality.12</Borland.Personality>

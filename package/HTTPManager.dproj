@@ -20,7 +20,7 @@
 			<Base>true</Base>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Base)'!=''">
-			<DCC_UnitSearchPath>../ext//OmniThreadLibrary;../ext//OmniThreadLibrary\src;../ext/MultiEvent;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+			<DCC_UnitSearchPath>../ext\BESEN\src;../ext\OmniThreadLibrary;../ext\OmniThreadLibrary\src;../ext\MultiEvent;../ext\TRegExpr\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
 			<DesignOnlyPackage>false</DesignOnlyPackage>
 			<DCC_DcuOutput>../lib</DCC_DcuOutput>
 			<DCC_UnitAlias>WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;$(DCC_UnitAlias)</DCC_UnitAlias>
@@ -54,6 +54,8 @@
 			<DCCReference Include="..\src\uHTTPImplementation.pas"/>
 			<DCCReference Include="..\src\implementors\uHTTPIndyImplementor.pas"/>
 			<DCCReference Include="..\src\implementors\uHTTPIndyHelper.pas"/>
+			<DCCReference Include="..\src\uHTTPAntiScrape.pas"/>
+			<DCCReference Include="..\src\antiscrape\uHTTPCloudflareAntiScrape.pas"/>
 			<BuildConfiguration Include="Basis">
 				<Key>Base</Key>
 			</BuildConfiguration>
