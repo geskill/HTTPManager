@@ -12,7 +12,6 @@ object Main: TMain
   Font.Style = []
   OldCreateOrder = False
   OnCreate = FormCreate
-  OnDestroy = FormDestroy
   DesignSize = (
     635
     300)
@@ -69,6 +68,10 @@ object Main: TMain
     object cxTSPostRequest: TcxTabSheet
       Caption = 'POST-Request'
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       DesignSize = (
         611
         225)

@@ -155,9 +155,7 @@ begin
       HTTPParams := nil;
       HTTPRequest := nil;
 
-      repeat
-        sleep(75);
-      until THTTPManager.Instance().HasResult(LRequestID);
+      THTTPManager.Instance().WaitFor(LRequestID);
 
       if not NeedToHandle(THTTPManager.Instance().GetResult(LRequestID).HTTPResult.HTTPResponse) then
       begin

@@ -93,9 +93,7 @@ begin
 
     RequestID := HTTPManager.Get(THTTPRequest.Create(AImageLink), HTTPOptions);
 
-    repeat
-      sleep(75);
-    until HTTPManager.HasResult(RequestID);
+    HTTPManager.WaitFor(RequestID);
 
     HTTPProcess := HTTPManager.GetResult(RequestID);
 

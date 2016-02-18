@@ -49,9 +49,7 @@ begin
   Parallel.Async(
     { } procedure
     { } begin
-    { . } repeat
-    { ... } sleep(50); // you can lower the time to make more checks if the request is finished
-    { . } until HTTPManager.HasResult(RequestID);
+    { . } HTTPManager.WaitFor(RequestID);
     { } end,
     { } Parallel.TaskConfig.OnTerminated(
       { } procedure(const task: IOmniTaskControl)
