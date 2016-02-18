@@ -359,6 +359,8 @@ type
     function HasResult(AUniqueID: Double): WordBool; safecall;
     function GetResult(AUniqueID: Double): IHTTPProcess; safecall;
 
+    function WaitFor(AUniqueID: Double; AMaxWaitMS: Integer = INFINITE): WordBool; safecall;
+
     property Implementor: IHTTPImplementation read GetImplementor write SetImplementor;
     property ImplementationManager: IHTTPImplementationManager read GetImplementationManager;
 

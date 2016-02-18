@@ -229,6 +229,8 @@ type
     {$ENDREGION}
     function GetResult(AUniqueID: Double): IHTTPProcess; safecall;
 
+    function WaitFor(AUniqueID: Double; AMaxWaitMS: Integer = INFINITE): WordBool; safecall;
+
     property Implementor: IHTTPImplementation read GetImplementor write SetImplementor;
     property ImplementationManager: IHTTPImplementationManager read GetImplementationManager;
     {$REGION 'Documentation'}
@@ -662,6 +664,27 @@ begin
   finally
     FRequestArrayLock.ExitReadLock;
   end;
+end;
+
+function THTTPManager.WaitFor(AUniqueID: Double; AMaxWaitMS: Integer = INFINITE): WordBool;
+var
+  Index: Integer;
+  TaskControl: IOmniTaskControl;
+begin
+  Result := False;
+
+  Index := Trunc(AUniqueID);
+
+  FTaskControlArrayLock.EnterWriteLock;
+  try
+    if (Index > FRequestArrayLowerBound.Value) and (Index < length(FTaskControlArray)) then
+      TaskControl := FTaskControlArray[Index];
+  finally
+    FTaskControlArrayLock.ExitWriteLock;
+  end;
+
+  if Assigned(TaskControl) then
+    Result := TaskControl.WaitFor(AMaxWaitMS);
 end;
 
 destructor THTTPManager.Destroy;
