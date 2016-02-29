@@ -51,11 +51,11 @@
 			<DCCReference Include="..\src\uHTTPManager.pas"/>
 			<DCCReference Include="..\src\uHTTPManagerClasses.pas"/>
 			<DCCReference Include="..\src\uHTTPEvent.pas"/>
-			<DCCReference Include="..\src\uHTTPImplementation.pas"/>
 			<DCCReference Include="..\src\implementors\uHTTPIndyImplementor.pas"/>
 			<DCCReference Include="..\src\implementors\uHTTPIndyHelper.pas"/>
-			<DCCReference Include="..\src\uHTTPAntiScrape.pas"/>
 			<DCCReference Include="..\src\antiscrape\uHTTPCloudflareAntiScrape.pas"/>
+			<DCCReference Include="..\src\uHTTPExtensionClasses.pas"/>
+			<DCCReference Include="..\src\uHTTPExtensionManager.pas"/>
 			<BuildConfiguration Include="Basis">
 				<Key>Base</Key>
 			</BuildConfiguration>

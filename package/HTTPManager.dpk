@@ -35,10 +35,10 @@ contains
   uHTTPManager in '..\src\uHTTPManager.pas',
   uHTTPManagerClasses in '..\src\uHTTPManagerClasses.pas',
   uHTTPEvent in '..\src\uHTTPEvent.pas',
-  uHTTPImplementation in '..\src\uHTTPImplementation.pas',
   uHTTPIndyImplementor in '..\src\implementors\uHTTPIndyImplementor.pas',
   uHTTPIndyHelper in '..\src\implementors\uHTTPIndyHelper.pas',
-  uHTTPAntiScrape in '..\src\uHTTPAntiScrape.pas',
-  uHTTPCloudflareAntiScrape in '..\src\antiscrape\uHTTPCloudflareAntiScrape.pas';
+  uHTTPCloudflareAntiScrape in '..\src\antiscrape\uHTTPCloudflareAntiScrape.pas',
+  uHTTPExtensionClasses in '..\src\uHTTPExtensionClasses.pas',
+  uHTTPExtensionManager in '..\src\uHTTPExtensionManager.pas';
 
 end.
