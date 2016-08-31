@@ -26,8 +26,17 @@ type
     property Name: WideString read GetName;
   end;
 
+  THTTPAntiCaptcha = class abstract(THTTPExtension, IHTTPAntiCaptcha)
+  public
+    function RequiresHandling(const AIHTTPResponse: IHTTPResponse): WordBool; virtual; safecall; abstract;
+    procedure Handle(const ASenderContext: WideString; const ASenderName: WideString; const ASenderWebsite: WideString; const ASenderWebsiteSource: WideString; const ACaptcha: WideString; out ACaptchaSolution: WideString; var ACookies: WideString; var AHandled: WordBool); virtual; safecall; abstract;
+
+    property Name;
+  end;
+
   THTTPAntiScrape = class abstract(THTTPExtension, IHTTPAntiScrape)
   public
+    function RequiresHandling(const AIHTTPResponse: IHTTPResponse): WordBool; virtual; safecall; abstract;
     procedure Handle(const AHTTPProcess: IHTTPProcess; out AHTTPData: IHTTPData; var AHandled: WordBool); virtual; safecall; abstract;
 
     property Name;

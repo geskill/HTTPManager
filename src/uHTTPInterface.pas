@@ -328,10 +328,33 @@ type
     property Extension[AIndex: Integer]: IHTTPExtension read GetExtension; default;
   end;
 
+  IHTTPAntiCaptcha = interface(IHTTPExtension)
+    ['{252EC359-915D-426A-9DF6-2659883B3242}']
+    function GetName: WideString; safecall;
+
+    function RequiresHandling(const AIHTTPResponse: IHTTPResponse): WordBool; safecall;
+    procedure Handle(const ASenderContext: WideString; const ASenderName: WideString; const ASenderWebsite: WideString; const ASenderWebsiteSource: WideString; const ACaptcha: WideString; out ACaptchaSolution: WideString; var ACookies: WideString; var AHandled: WordBool); safecall;
+
+    property Name: WideString read GetName;
+  end;
+
+  IHTTPAntiCaptchaManager = interface(IHTTPExtensionManager)
+    ['{D5BE5CB3-CE28-42F1-8009-48E9254CC6CC}']
+    function GetCount: Integer; safecall;
+    function GetExtension(AIndex: Integer): IHTTPAntiCaptcha; safecall;
+
+    function Register(const AExtension: IHTTPAntiCaptcha): WordBool; safecall;
+    function Unregister(const AName: WideString): WordBool; safecall;
+
+    property Count: Integer read GetCount;
+    property Extension[AIndex: Integer]: IHTTPAntiCaptcha read GetExtension; default;
+  end;
+
   IHTTPAntiScrape = interface(IHTTPExtension)
     ['{03C8BCF2-87B8-4665-9119-4E63EB5EEE2C}']
     function GetName: WideString; safecall;
 
+    function RequiresHandling(const AIHTTPResponse: IHTTPResponse): WordBool; safecall;
     procedure Handle(const AHTTPProcess: IHTTPProcess; out AHTTPData: IHTTPData; var AHandled: WordBool); safecall;
 
     property Name: WideString read GetName;
@@ -342,7 +365,7 @@ type
     function GetCount: Integer; safecall;
     function GetExtension(AIndex: Integer): IHTTPAntiScrape; safecall;
 
-    function Register(const AHTTPAntiScrape: IHTTPAntiScrape): WordBool; safecall;
+    function Register(const AExtension: IHTTPAntiScrape): WordBool; safecall;
     function Unregister(const AName: WideString): WordBool; safecall;
 
     property Count: Integer read GetCount;
@@ -363,7 +386,7 @@ type
     function GetCount: Integer; safecall;
     function GetExtension(AIndex: Integer): IHTTPImplementation; safecall;
 
-    function Register(const AHTTPImplementation: IHTTPImplementation): WordBool; safecall;
+    function Register(const AExtension: IHTTPImplementation): WordBool; safecall;
     function Unregister(const AName: WideString): WordBool; safecall;
 
     property Count: Integer read GetCount;
@@ -374,6 +397,7 @@ type
     ['{DB7FBA4F-CE5C-454A-AA74-FB8EC7DFAB8E}']
     function GetConnectionMaximum: Integer; safecall;
     procedure SetConnectionMaximum(const AConnectionMaximum: Integer); safecall;
+    function GetAntiCaptchaManager: IHTTPAntiCaptchaManager; safecall;
     function GetAntiScrapeManager: IHTTPAntiScrapeManager; safecall;
     function GetImplementor: IHTTPImplementation; safecall;
     procedure SetImplementor(const AImplementor: IHTTPImplementation); safecall;
@@ -391,6 +415,8 @@ type
     function GetResult(AUniqueID: Double): IHTTPProcess; safecall;
 
     function WaitFor(AUniqueID: Double; AMaxWaitMS: Cardinal = INFINITE): WordBool; safecall;
+
+    property AntiCaptchaManager: IHTTPAntiCaptchaManager read GetAntiCaptchaManager;
 
     property AntiScrapeManager: IHTTPAntiScrapeManager read GetAntiScrapeManager;
 

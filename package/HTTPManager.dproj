@@ -45,6 +45,9 @@
 			</DelphiCompile>
 			<DCCReference Include="rtl.dcp"/>
 			<DCCReference Include="vcl.dcp"/>
+			<DCCReference Include="IndyCore.dcp"/>
+			<DCCReference Include="IndySystem.dcp"/>
+			<DCCReference Include="IndyProtocols.dcp"/>
 			<DCCReference Include="..\src\uHTTPClasses.pas"/>
 			<DCCReference Include="..\src\uHTTPConst.pas"/>
 			<DCCReference Include="..\src\uHTTPInterface.pas"/>
@@ -56,6 +59,7 @@
 			<DCCReference Include="..\src\antiscrape\uHTTPCloudflareAntiScrape.pas"/>
 			<DCCReference Include="..\src\uHTTPExtensionClasses.pas"/>
 			<DCCReference Include="..\src\uHTTPExtensionManager.pas"/>
+			<DCCReference Include="..\src\anticaptcha\uHTTPvBulletinRandomQuestionAntiCaptcha.pas"/>
 			<BuildConfiguration Include="Basis">
 				<Key>Base</Key>
 			</BuildConfiguration>
@@ -115,11 +119,3 @@
 			<ProjectFileVersion>12</ProjectFileVersion>
 		</ProjectExtensions>
 	</Project>
-
-<!-- EurekaLog First Line
-[Exception Log]
-EurekaLog Version=7007
-Activate=0
-DeleteMapAfterCompile=1
-Encrypt Password=""
-EurekaLog Last Line -->

@@ -65,6 +65,7 @@ type
     FRequestArrayLowerBoundUpdate: Boolean;
     FRequestArrayLowerBound: TOmniAlignedInt32;
     FThreadPool: IOmniThreadPool;
+    FAntiCaptchaManager: IHTTPAntiCaptchaManager;
     FAntiScrapeManager: IHTTPAntiScrapeManager;
     FImplementor: IHTTPImplementation;
     FImplementationManager: IHTTPImplementationManager;
@@ -92,6 +93,7 @@ type
   protected
     function GetConnectionMaximum: Integer; safecall;
     procedure SetConnectionMaximum(const AConnectionMaximum: Integer); safecall;
+    function GetAntiCaptchaManager: IHTTPAntiCaptchaManager; safecall;
     function GetAntiScrapeManager: IHTTPAntiScrapeManager; safecall;
     function GetImplementor: IHTTPImplementation; safecall;
     procedure SetImplementor(const AImplementor: IHTTPImplementation); safecall;
@@ -212,6 +214,8 @@ type
     function GetResult(AUniqueID: Double): IHTTPProcess; safecall;
 
     function WaitFor(AUniqueID: Double; AMaxWaitMS: Cardinal = INFINITE): WordBool; safecall;
+
+    property AntiCaptchaManager: IHTTPAntiCaptchaManager read GetAntiCaptchaManager;
 
     property AntiScrapeManager: IHTTPAntiScrapeManager read GetAntiScrapeManager;
 
@@ -467,11 +471,17 @@ begin
     MaxQueued := 0;
   end;
 
+  FAntiCaptchaManager := THTTPAntiCaptchaManager.Create;
   FAntiScrapeManager := THTTPAntiScrapeManager.Create;
   FImplementor := nil;
   FImplementationManager := THTTPImplementationManager.Create;
 
   FRequestDoneEvent := TIHTTPProcessEvent.Create;
+end;
+
+function THTTPManager.GetAntiCaptchaManager: IHTTPAntiCaptchaManager;
+begin
+  Result := FAntiCaptchaManager;
 end;
 
 function THTTPManager.GetAntiScrapeManager: IHTTPAntiScrapeManager;
@@ -620,6 +630,7 @@ begin
   FImplementationManager := nil;
   FImplementor := nil;
   FAntiScrapeManager := nil;
+  FAntiCaptchaManager := nil;
 
   if Assigned(FThreadPool) then
   begin

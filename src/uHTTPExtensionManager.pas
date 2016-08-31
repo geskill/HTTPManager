@@ -26,18 +26,28 @@ type
     constructor Create; virtual;
     destructor Destroy; override;
 
-    function Register(const AHTTPExtension: IHTTPExtension): WordBool; safecall;
+    function Register(const AExtension: IHTTPExtension): WordBool; safecall;
     function Unregister(const AName: WideString): WordBool; safecall;
 
     property Count: Integer read GetCount;
     property Extension[AIndex: Integer]: IHTTPExtension read GetExtension; default;
   end;
 
+  THTTPAntiCaptchaManager = class(THTTPExtensionManager, IHTTPAntiCaptchaManager)
+  protected
+    function GetExtension(AIndex: Integer): IHTTPAntiCaptcha; safecall;
+  public
+    function Register(const AExtension: IHTTPAntiCaptcha): WordBool; safecall;
+
+    property Count;
+    property Extension[AIndex: Integer]: IHTTPAntiCaptcha read GetExtension; default;
+  end;
+
   THTTPAntiScrapeManager = class(THTTPExtensionManager, IHTTPAntiScrapeManager)
   protected
     function GetExtension(AIndex: Integer): IHTTPAntiScrape; safecall;
   public
-    function Register(const AAntiScrape: IHTTPAntiScrape): WordBool; safecall;
+    function Register(const AExtension: IHTTPAntiScrape): WordBool; safecall;
 
     property Count;
     property Extension[AIndex: Integer]: IHTTPAntiScrape read GetExtension; default;
@@ -47,7 +57,7 @@ type
   protected
     function GetExtension(AIndex: Integer): IHTTPImplementation; safecall;
   public
-    function Register(const AImplementation: IHTTPImplementation): WordBool; safecall;
+    function Register(const AExtension: IHTTPImplementation): WordBool; safecall;
 
     property Count;
     property Extension[AIndex: Integer]: IHTTPImplementation read GetExtension; default;
@@ -55,7 +65,7 @@ type
 
 implementation
 
-{ THTTPExtensionManager<T> }
+{ THTTPExtensionManager }
 
 function THTTPExtensionManager.FindExtension(const AName: WideString): IHTTPExtension;
 var
@@ -98,11 +108,11 @@ begin
   inherited Destroy;
 end;
 
-function THTTPExtensionManager.Register(const AHTTPExtension: IHTTPExtension): WordBool;
+function THTTPExtensionManager.Register(const AExtension: IHTTPExtension): WordBool;
 begin
-  Result := not Assigned(FindExtension(AHTTPExtension.Name));
+  Result := not Assigned(FindExtension(AExtension.Name));
   if Result then
-    FExtensions.Add(AHTTPExtension);
+    FExtensions.Add(AExtension);
 end;
 
 function THTTPExtensionManager.Unregister(const AName: WideString): WordBool;
@@ -119,6 +129,18 @@ begin
     end;
 end;
 
+{ THTTPAntiCaptchaManager }
+
+function THTTPAntiCaptchaManager.GetExtension(AIndex: Integer): IHTTPAntiCaptcha;
+begin
+  Result := inherited GetExtension(AIndex) as IHTTPAntiCaptcha;
+end;
+
+function THTTPAntiCaptchaManager.Register(const AExtension: IHTTPAntiCaptcha): WordBool;
+begin
+  Result := inherited Register(AExtension);
+end;
+
 { THTTPAntiScrapeManager }
 
 function THTTPAntiScrapeManager.GetExtension(AIndex: Integer): IHTTPAntiScrape;
@@ -126,9 +148,9 @@ begin
   Result := inherited GetExtension(AIndex) as IHTTPAntiScrape;
 end;
 
-function THTTPAntiScrapeManager.Register(const AAntiScrape: IHTTPAntiScrape): WordBool;
+function THTTPAntiScrapeManager.Register(const AExtension: IHTTPAntiScrape): WordBool;
 begin
-  Result := inherited Register(AAntiScrape);
+  Result := inherited Register(AExtension);
 end;
 
 { THTTPImplementationManager }
@@ -138,9 +160,9 @@ begin
   Result := inherited GetExtension(AIndex) as IHTTPImplementation;
 end;
 
-function THTTPImplementationManager.Register(const AImplementation: IHTTPImplementation): WordBool;
+function THTTPImplementationManager.Register(const AExtension: IHTTPImplementation): WordBool;
 begin
-  Result := inherited Register(AImplementation);
+  Result := inherited Register(AExtension);
 end;
 
 end.

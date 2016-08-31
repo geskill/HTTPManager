@@ -26,7 +26,10 @@ package HTTPManager;
 
 requires
   rtl,
-  vcl;
+  vcl,
+  IndyCore,
+  IndySystem,
+  IndyProtocols;
 
 contains
   uHTTPClasses in '..\src\uHTTPClasses.pas',
@@ -39,6 +42,7 @@ contains
   uHTTPIndyHelper in '..\src\implementors\uHTTPIndyHelper.pas',
   uHTTPCloudflareAntiScrape in '..\src\antiscrape\uHTTPCloudflareAntiScrape.pas',
   uHTTPExtensionClasses in '..\src\uHTTPExtensionClasses.pas',
-  uHTTPExtensionManager in '..\src\uHTTPExtensionManager.pas';
+  uHTTPExtensionManager in '..\src\uHTTPExtensionManager.pas',
+  uHTTPvBulletinRandomQuestionAntiCaptcha in '..\src\anticaptcha\uHTTPvBulletinRandomQuestionAntiCaptcha.pas';
 
 end.

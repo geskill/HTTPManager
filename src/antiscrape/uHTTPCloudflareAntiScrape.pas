@@ -23,25 +23,20 @@ type
   private
     FCookieBuffer: TDictionary<string, string>;
 
-    function NeedToHandle(const AIHTTPResponse: IHTTPResponse): Boolean;
     function ExecJavaScript(const AScript: string): string;
-
   public
     constructor Create;
     destructor Destroy; override;
 
     class function GetExtensionName: string; override;
+
+    function RequiresHandling(const AIHTTPResponse: IHTTPResponse): WordBool; override;
     procedure Handle(const AHTTPProcess: IHTTPProcess; out AHTTPData: IHTTPData; var AHandled: WordBool); override;
   end;
 
 implementation
 
 { THTTPCloudflareAntiScrape }
-
-function THTTPCloudflareAntiScrape.NeedToHandle(const AIHTTPResponse: IHTTPResponse): Boolean;
-begin
-  Result := (AIHTTPResponse.Server = 'cloudflare-nginx') and (Pos('/cdn-cgi/', string(AIHTTPResponse.Refresh)) > 0);
-end;
 
 function THTTPCloudflareAntiScrape.ExecJavaScript(const AScript: string): string;
 var
@@ -95,6 +90,11 @@ begin
   Result := 'Cloudflare';
 end;
 
+function THTTPCloudflareAntiScrape.RequiresHandling(const AIHTTPResponse: IHTTPResponse): WordBool;
+begin
+  Result := (AIHTTPResponse.Server = 'cloudflare-nginx') and (Pos('/cdn-cgi/', string(AIHTTPResponse.Refresh)) > 0);
+end;
+
 procedure THTTPCloudflareAntiScrape.Handle(const AHTTPProcess: IHTTPProcess; out AHTTPData: IHTTPData; var AHandled: WordBool);
 var
   cf_clearance, jschl_vc, pass, jschl_answer, jschl_script: string;
@@ -125,7 +125,7 @@ begin
     begin
       FCookieBuffer.AddOrSetValue(LHost, AHTTPProcess.HTTPData.HTTPRequest.Cookies.Values['cf_clearance']);
     end
-    else if NeedToHandle(AHTTPProcess.HTTPResult.HTTPResponse) then
+    else if RequiresHandling(AHTTPProcess.HTTPResult.HTTPResponse) then
     begin
       if (Pos('why_captcha', string(AHTTPProcess.HTTPResult.SourceCode)) > 0) then
       begin
@@ -160,7 +160,7 @@ begin
 
         THTTPManager.Instance().WaitFor(LRequestID);
 
-        if not NeedToHandle(THTTPManager.Instance().GetResult(LRequestID).HTTPResult.HTTPResponse) then
+        if not RequiresHandling(THTTPManager.Instance().GetResult(LRequestID).HTTPResult.HTTPResponse) then
         begin
           AHTTPProcess.HTTPResult := THTTPManager.Instance().GetResult(LRequestID).HTTPResult;
           FCookieBuffer.AddOrSetValue(LHost, cf_clearance);
